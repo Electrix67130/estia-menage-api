@@ -1,0 +1,54 @@
+{
+  "name": "estia-menage-api",
+  "version": "0.1.0",
+  "description": "API REST pour la gestion de prestations de ménage Estia",
+  "main": "src/server.ts",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "build": "tsc",
+    "migrate": "knex migrate:latest --knexfile src/config/knexfile.js",
+    "migrate:make": "knex migrate:make --knexfile src/config/knexfile.js",
+    "migrate:rollback": "knex migrate:rollback --knexfile src/config/knexfile.js",
+    "seed": "knex seed:run --knexfile src/config/knexfile.js",
+    "seed:make": "knex seed:make --knexfile src/config/knexfile.js",
+    "test": "jest --verbose",
+    "test:unit": "jest --verbose tests/unit",
+    "test:integration": "jest --verbose tests/integration"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Electrix67130/estia-menage-api.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/autoload": "^6.3.1",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/jwt": "^10.0.0",
+    "@fastify/multipart": "^10.0.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/sensible": "^6.0.4",
+    "@fastify/static": "^9.1.0",
+    "@fastify/websocket": "^11.2.0",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.3.1",
+    "fastify": "^5.8.2",
+    "fastify-plugin": "^5.0.1",
+    "knex": "^3.1.0",
+    "nodemailer": "^8.0.5",
+    "pg": "^8.20.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/node": "^25.4.0",
+    "@types/nodemailer": "^8.0.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

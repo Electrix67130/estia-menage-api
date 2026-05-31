@@ -1,0 +1,63 @@
+
+networks:
+  estia_menage_api_network:
+    driver: bridge
+
+services:
+  estia-menage-api:
+    container_name: estia-menage-api
+    build:
+      context: .
+      target: development
+    ports:
+      - "${PORT:-3001}:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      HOST: 0.0.0.0
+      DB_HOST: estia-menage-db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-estia_menage_api}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES:-15m}
+      API_KEY: ${API_KEY:-change-me-in-production}
+      APP_URL: ${APP_URL:-http://192.168.1.228:3001}
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      estia-menage-db:
+        condition: service_healthy
+    networks:
+      - estia_menage_api_network
+    healthcheck:
+      test: wget -q --spider http://127.0.0.1:3000/health || exit 1
+      interval: 30s
+      retries: 3
+      start_period: 10s
+      timeout: 10s
+
+  estia-menage-db:
+    container_name: estia-menage-db
+    image: postgres:17-alpine
+    ports:
+      - "${DB_PORT:-5434}:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME:-estia_menage_api}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - estia_menage_api_db_data:/var/lib/postgresql/data
+    networks:
+      - estia_menage_api_network
+    healthcheck:
+      test: pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-estia_menage_api}
+      interval: 10s
+      retries: 5
+      start_period: 5s
+      timeout: 5s
+
+volumes:
+  estia_menage_api_db_data:
