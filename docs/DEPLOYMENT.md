@@ -459,10 +459,23 @@ chmod +x /home/estia/deploy.sh
 
 ## 10. CI/CD GitHub Actions (1h)
 
-- **API** : déploiement via SSH depuis GitHub Actions (cf. §3.8).
-  Workflow `deploy-api.yml` qui SSH sur le VPS et lance `/home/estia/deploy.sh` sur push master.
-  Secrets GitHub à configurer : `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`.
-- **Dashboard** : Vercel auto-deploy depuis push master → rien à configurer.
+Les workflows sont **déjà dans les repos** (`.github/workflows/deploy.yml` côté
+API **et** côté dashboard). Sur push `master` : gate `tsc --noEmit`, puis SSH sur
+le VPS qui lance `/home/estia/deploy.sh` (lequel `git pull` + rebuild **API
+Docker + dashboard** — un push sur l'un ou l'autre resynchronise les deux). Un
+verrou `concurrency: deploy-vps` empêche deux déploiements simultanés.
+
+- **Secrets GitHub à configurer dans CHAQUE repo** (Settings → Secrets and
+  variables → Actions) : `SSH_HOST`, `SSH_USER` (= `estia`), `SSH_PRIVATE_KEY`
+  (clé privée dont la publique est dans `~estia/.ssh/authorized_keys`),
+  `SSH_PORT` (optionnel, défaut 22).
+- **Activation** : tant que le VPS n'existe pas, le job `deploy` est **désactivé**
+  (seul le typecheck tourne). Quand le VPS est prêt et les secrets renseignés,
+  ajouter la **variable** de repo `DEPLOY_ENABLED=true` (onglet *Variables*) dans
+  chaque repo pour activer le déploiement automatique.
+- **Prérequis VPS** : `/home/estia/deploy.sh` exécutable ; accès lecture aux
+  repos pour `git pull` (deploy key si repos privés) ; `sudo` NOPASSWD pour
+  `systemctl restart estia-dashboard`.
 - **Mobile** : optionnel, EAS auto-builds via `eas-cli` quand on tag une version.
   Pour la phase pilote, builds manuels suffisent
   (`eas build --platform all --profile preview`).

@@ -1,0 +1,65 @@
+# Déploiement test Estia — API.
+# Sur push master : on vérifie que le code compile (gate), puis on se connecte
+# en SSH au VPS et on lance /home/estia/deploy.sh (git pull + docker build +
+# migrate + up, cf. docs/DEPLOYMENT.md §3.8/§4.4).
+#
+# Secrets GitHub requis (Settings → Secrets and variables → Actions) :
+#   SSH_HOST         IP ou hostname du VPS (ex. api.estia-menage.fr)
+#   SSH_USER         utilisateur de déploiement (ex. estia)
+#   SSH_PRIVATE_KEY  clé privée SSH dont la publique est dans
+#                    ~estia/.ssh/authorized_keys sur le VPS
+#   SSH_PORT         (optionnel) port SSH, défaut 22
+#
+# Prérequis côté VPS (cf. DEPLOYMENT.md) :
+#   - /home/estia/deploy.sh présent et exécutable
+#   - accès lecture aux repos GitHub pour `git pull` (deploy key ou repos publics)
+#   - sudo NOPASSWD pour `systemctl restart estia-dashboard`
+name: Deploy API (test)
+
+on:
+  push:
+    branches: [master]
+    # On évite de redéployer pour des changements purement docs/CI.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.github/**'
+  workflow_dispatch: {}
+
+# Un seul déploiement à la fois sur le VPS (API et dashboard partagent le verrou).
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  deploy:
+    name: Deploy over SSH
+    needs: check
+    runs-on: ubuntu-latest
+    # Désactivé tant que le VPS n'existe pas : passe la variable de repo
+    # DEPLOY_ENABLED=true (Settings → Secrets and variables → Actions → Variables)
+    # une fois le VPS provisionné et les secrets SSH renseignés.
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    steps:
+      - name: Run deploy.sh on the VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          command_timeout: 20m
+          script_stop: true
+          script: /home/estia/deploy.sh
