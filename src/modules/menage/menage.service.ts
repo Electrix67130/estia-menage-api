@@ -130,13 +130,24 @@ class MenageService extends BaseService<MenageRow> {
   /**
    * Crée un ménage et génère automatiquement sa checklist (sections + items)
    * à partir des paramètres du logement parent. Tout en une seule transaction.
+   *
+   * Les compteurs de couchage (lit simple/double/canapé/appoint) sont copiés
+   * depuis le logement si non fournis dans le payload (override par ménage
+   * possible côté admin pour saisonnalité / demande spéciale).
    */
   async createWithChecklist(
     data: Partial<MenageRow>,
     logement: LogementRow,
   ): Promise<MenageRow> {
+    const withDefaults: Partial<MenageRow> = {
+      ...data,
+      n_lit_simple: data.n_lit_simple ?? logement.n_lit_simple,
+      n_lit_double: data.n_lit_double ?? logement.n_lit_double,
+      n_canape_lit: data.n_canape_lit ?? logement.n_canape_lit,
+      n_lit_appoint: data.n_lit_appoint ?? logement.n_lit_appoint,
+    };
     return this.db.transaction(async (trx) => {
-      const [menage] = (await trx('menage').insert(data).returning('*')) as MenageRow[];
+      const [menage] = (await trx('menage').insert(withDefaults).returning('*')) as MenageRow[];
       await generateChecklistForMenage(trx, menage.id, logement);
       return menage;
     });

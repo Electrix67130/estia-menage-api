@@ -8,6 +8,10 @@ export const createLogementSchema = z.object({
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   n_bedrooms: z.number().int().min(0).max(50).default(0),
+  n_lit_simple: z.number().int().min(0).max(50).default(0),
+  n_lit_double: z.number().int().min(0).max(50).default(0),
+  n_canape_lit: z.number().int().min(0).max(50).default(0),
+  n_lit_appoint: z.number().int().min(0).max(50).default(0),
   n_bathrooms: z.number().int().min(0).max(50).default(0),
   n_wc: z.number().int().min(0).max(50).default(0),
   n_kitchens: z.number().int().min(0).max(10).default(1),
@@ -45,6 +49,10 @@ export const updateLogementSchema = z.object({
   latitude: z.number().min(-90).max(90).nullable().optional(),
   longitude: z.number().min(-180).max(180).nullable().optional(),
   n_bedrooms: z.number().int().min(0).max(50).optional(),
+  n_lit_simple: z.number().int().min(0).max(50).optional(),
+  n_lit_double: z.number().int().min(0).max(50).optional(),
+  n_canape_lit: z.number().int().min(0).max(50).optional(),
+  n_lit_appoint: z.number().int().min(0).max(50).optional(),
   n_bathrooms: z.number().int().min(0).max(50).optional(),
   n_wc: z.number().int().min(0).max(50).optional(),
   n_kitchens: z.number().int().min(0).max(10).optional(),
@@ -86,6 +94,10 @@ export type LogementRow = {
   latitude: number | null;
   longitude: number | null;
   n_bedrooms: number;
+  n_lit_simple: number;
+  n_lit_double: number;
+  n_canape_lit: number;
+  n_lit_appoint: number;
   n_bathrooms: number;
   n_wc: number;
   n_kitchens: number;

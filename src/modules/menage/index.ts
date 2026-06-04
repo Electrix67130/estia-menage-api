@@ -121,7 +121,7 @@ export default fp(
             'user.email',
             'user.avatar_url',
             fastify.db.raw(
-              `EXISTS (SELECT 1 FROM logement_member lm WHERE lm.logement_id = ? AND lm.user_id = user.id AND lm.role = 'prestataire') as is_member`,
+              `EXISTS (SELECT 1 FROM logement_member lm WHERE lm.logement_id = ? AND lm.user_id = "user".id AND lm.role = 'prestataire') as is_member`,
               [menage.logement_id],
             ),
           )

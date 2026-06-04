@@ -18,6 +18,10 @@ export const createMenageSchema = z.object({
   laundry_included: z.boolean().optional(),
   laundry_client_price_ht: z.number().min(0).max(100000).optional(),
   laundry_provider_price: z.number().min(0).max(100000).optional(),
+  n_lit_simple: z.number().int().min(0).max(50).optional(),
+  n_lit_double: z.number().int().min(0).max(50).optional(),
+  n_canape_lit: z.number().int().min(0).max(50).optional(),
+  n_lit_appoint: z.number().int().min(0).max(50).optional(),
   notes_intervention: z.string().max(5000).optional(),
 });
 
@@ -35,6 +39,10 @@ export const updateMenageSchema = z.object({
   laundry_included: z.boolean().optional(),
   laundry_client_price_ht: z.number().min(0).max(100000).nullable().optional(),
   laundry_provider_price: z.number().min(0).max(100000).nullable().optional(),
+  n_lit_simple: z.number().int().min(0).max(50).optional(),
+  n_lit_double: z.number().int().min(0).max(50).optional(),
+  n_canape_lit: z.number().int().min(0).max(50).optional(),
+  n_lit_appoint: z.number().int().min(0).max(50).optional(),
   notes_intervention: z.string().max(5000).nullable().optional(),
   status: menageStatusEnum.optional(),
   // Édition manuelle des timestamps de pointage (admin only — contrôle côté route).
@@ -117,6 +125,10 @@ export type MenageRow = {
   laundry_included: boolean;
   laundry_client_price_ht: number | string | null;
   laundry_provider_price: number | string | null;
+  n_lit_simple: number;
+  n_lit_double: number;
+  n_canape_lit: number;
+  n_lit_appoint: number;
   validated_at: string | null;
   validated_by: string | null;
   validated_price: number | string | null;
@@ -137,6 +149,12 @@ export type MenageRow = {
   logement_longitude?: number | string | null;
   /** True s'il existe au moins une demande de report `pending` sur ce ménage. */
   has_pending_reschedule?: boolean;
+  /**
+   * Calculé (cf. `computeNeedsAttention`) : le jour prévu est passé, personne
+   * n'a pointé (`arrived_at` vide) et le ménage est toujours `a_venir`.
+   * Sert à mettre le ménage en évidence côté dashboard/mobile.
+   */
+  needs_attention?: boolean;
 };
 
 /**
@@ -149,12 +167,37 @@ export const ADMIN_ONLY_FINANCIAL_FIELDS = [
   'laundry_client_price_ht',
 ] as const;
 
+/**
+ * Un ménage « demande attention » quand son jour prévu est passé, qu'aucun
+ * pointage d'arrivée n'a été enregistré, et qu'il est toujours `a_venir`
+ * (ni en cours, ni terminé, ni annulé). On compare en date locale serveur
+ * (date_prevue est une DATE sans heure).
+ */
+export function computeNeedsAttention(
+  menage: Pick<MenageRow, 'status' | 'date_prevue' | 'arrived_at'>,
+): boolean {
+  if (menage.status !== 'a_venir') return false;
+  if (menage.arrived_at) return false;
+  if (!menage.date_prevue) return false;
+  // `date_prevue` (colonne DATE) peut arriver comme objet Date (node-pg) ou
+  // comme chaîne — on normalise dans les deux cas en `YYYY-MM-DD`.
+  const raw: unknown = menage.date_prevue;
+  const datePart =
+    raw instanceof Date ? raw.toISOString().slice(0, 10) : String(raw).slice(0, 10);
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+    now.getDate(),
+  ).padStart(2, '0')}`;
+  return datePart < today;
+}
+
 export function serializeMenageForRole(
   menage: MenageRow,
   opts: { isAdmin: boolean; isPrestataire: boolean },
 ): Partial<MenageRow> {
-  if (opts.isAdmin) return menage;
-  const out: Partial<MenageRow> = { ...menage };
+  const needs_attention = computeNeedsAttention(menage);
+  if (opts.isAdmin) return { ...menage, needs_attention };
+  const out: Partial<MenageRow> = { ...menage, needs_attention };
   for (const field of ADMIN_ONLY_FINANCIAL_FIELDS) {
     delete (out as Record<string, unknown>)[field];
   }

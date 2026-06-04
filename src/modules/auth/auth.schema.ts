@@ -25,8 +25,6 @@ export const registerSchema = z.object({
       phone: z.string().max(20).nullable().optional(),
       billing_email: z.string().email().max(255).nullable().optional(),
       website: z.string().url().max(500).nullable().optional(),
-      insurance_provider: z.string().max(200).nullable().optional(),
-      insurance_number: z.string().max(100).nullable().optional(),
     })
     .optional(),
   platform: z.enum(['mobile', 'web']).optional().default('web'),

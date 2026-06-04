@@ -19,9 +19,6 @@ const legalFields = {
   website: z.string().url().max(500).nullable().optional(),
 
   logo_url: z.string().url().max(500).nullable().optional(),
-
-  insurance_provider: z.string().max(200).nullable().optional(),
-  insurance_number: z.string().max(100).nullable().optional(),
 };
 
 export const createOrganizationSchema = z.object({
@@ -54,8 +51,6 @@ export type OrganizationRow = {
   billing_email?: string | null;
   website?: string | null;
   logo_url?: string | null;
-  insurance_provider?: string | null;
-  insurance_number?: string | null;
   created_at: string;
   updated_at: string;
 };

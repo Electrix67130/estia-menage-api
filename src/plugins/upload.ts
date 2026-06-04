@@ -2,16 +2,12 @@ import fp from 'fastify-plugin';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { randomUUID, createHmac } from 'crypto';
 import path from 'path';
-import fs from 'fs';
 import { z } from 'zod';
 import env from '@/config/env';
+import storage from '@/lib/storage';
+import { optimizeImageStream } from '@/lib/image';
 
-const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads');
 const TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
 
 /** Generate a signed token: filename + expiry, signed with JWT_SECRET */
 function generateFileToken(filename: string): { token: string; expires: number } {
@@ -40,9 +36,8 @@ async function uploadPlugin(fastify: FastifyInstance) {
   fastify.get('/files/token/:filename', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { filename } = z.object({ filename: z.string().min(1) }).parse(request.params);
     const safeName = path.basename(filename);
-    const filePath = path.join(UPLOAD_DIR, safeName);
 
-    if (!fs.existsSync(filePath)) {
+    if (!(await storage.exists(safeName))) {
       return reply.notFound('File not found');
     }
 
@@ -61,9 +56,14 @@ async function uploadPlugin(fastify: FastifyInstance) {
       return reply.code(403).send({ statusCode: 403, error: 'Forbidden', message: 'Token expired or invalid' });
     }
 
-    const filePath = path.join(UPLOAD_DIR, safeName);
-    if (!fs.existsSync(filePath)) {
+    if (!(await storage.exists(safeName))) {
       return reply.notFound('File not found');
+    }
+
+    // En mode S3, on redirige vers une URL présignée (le téléchargement se fait
+    // directement depuis Object Storage). En local, on sert le fichier du disque.
+    if (storage.mode === 's3') {
+      return reply.redirect(await storage.presignedUrl(safeName));
     }
 
     return reply.sendFile(safeName);
@@ -78,21 +78,18 @@ async function uploadPlugin(fastify: FastifyInstance) {
 
     const ext = path.extname(data.filename) || '';
     const storedName = `${randomUUID()}${ext}`;
-    const filePath = path.join(UPLOAD_DIR, storedName);
 
-    const writeStream = fs.createWriteStream(filePath);
-    await new Promise<void>((resolve, reject) => {
-      data.file.pipe(writeStream);
-      data.file.on('end', resolve);
-      data.file.on('error', reject);
-    });
+    // Les images sont optimisées à la volée (resize + recompression) avant
+    // stockage. Les autres types de fichiers passent tels quels.
+    const optimizer = optimizeImageStream(data.mimetype);
+    const body = optimizer ? data.file.pipe(optimizer) : data.file;
 
-    const stat = fs.statSync(filePath);
+    const { size } = await storage.upload(storedName, body, data.mimetype);
 
     return reply.code(201).send({
       url: `${env.APP_URL}/files/${storedName}`,
       original_name: data.filename,
-      file_size: stat.size,
+      file_size: size,
       mime_type: data.mimetype,
     });
   });

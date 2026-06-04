@@ -1,0 +1,71 @@
+# Stack de production (phase pilote Estia) : API + Postgres sur un seul VPS.
+# Caddy (HTTPS) tourne sur l'hôte et proxy vers le port 3000 publié en local.
+#
+# Usage :
+#   docker compose -f docker-compose.prod.yml build
+#   docker compose -f docker-compose.prod.yml run --rm api npm run migrate
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Les variables (DB_*, JWT_SECRET, S3_*, SMTP_*, ...) sont lues depuis le
+# fichier .env présent dans ce dossier (interpolation compose + env_file).
+
+networks:
+  estia_menage_prod:
+    driver: bridge
+
+services:
+  api:
+    container_name: estia-menage-api
+    build:
+      context: .
+      target: production
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      # Surcharge : dans le réseau compose, la DB est joignable via le nom de service.
+      DB_HOST: db
+      DB_PORT: 5432
+    # Publié uniquement en local : Caddy (hôte) fait le reverse proxy HTTPS.
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      # Persiste les photos en mode STORAGE_MODE=local (inutile mais inoffensif en s3).
+      - estia_uploads:/usr/src/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - estia_menage_prod
+    healthcheck:
+      test: wget -q --spider http://127.0.0.1:3000/health || exit 1
+      interval: 30s
+      retries: 3
+      start_period: 15s
+      timeout: 10s
+
+  db:
+    container_name: estia-menage-db
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - estia_db_data:/var/lib/postgresql/data
+    # Pas de `ports:` → Postgres n'est jamais exposé hors du VPS.
+    networks:
+      - estia_menage_prod
+    healthcheck:
+      test: pg_isready -U ${DB_USER} -d ${DB_NAME}
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 5s
+
+volumes:
+  estia_uploads:
+  estia_db_data:

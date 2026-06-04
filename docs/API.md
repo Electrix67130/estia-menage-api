@@ -141,6 +141,10 @@ Bien locatif paramétrable. Source des paramètres de génération de checklist.
   "n_kitchens": 1,
   "n_living_rooms": 1,
   "n_exterior_spaces": 1,
+  "n_lit_simple": 1,
+  "n_lit_double": 1,
+  "n_canape_lit": 0,
+  "n_lit_appoint": 0,
   "has_basement": false,
   "has_laundry": true,
   "surface_m2": 35,
@@ -155,6 +159,7 @@ Bien locatif paramétrable. Source des paramètres de génération de checklist.
 Champs spécifiques :
 - `key_safe_code` (string, max 50) — code de boîte à clef, masqué par défaut côté UI mobile (eye toggle pour révéler). Visible à l'admin + à tout `logement_member` (les prestas en ont besoin pour entrer).
 - `cover_photo_url` (string, max 500) — URL d'une photo de profil/cover du logement (uploadée via le flow `/upload` puis PATCH avec l'URL retournée).
+- `n_lit_simple` / `n_lit_double` / `n_canape_lit` / `n_lit_appoint` (int 0-50, default 0) — composition des lits du bien. Ces valeurs sont **copiées sur chaque nouveau ménage** à la création (cf. `POST /menages`) puis modifiables indépendamment par ménage (saisonnalité, demande spéciale).
 
 ### Auto-génération des pièces
 
@@ -251,6 +256,8 @@ Permissions par défaut selon rôle (cf. `logement-member.service.ts`):
 
 Prestation de ménage datée, FK logement + prestataire.
 
+Chaque ménage sérialisé (liste **et** détail) inclut un booléen calculé **`needs_attention`** : `true` quand le jour prévu est passé, qu'aucun pointage d'arrivée n'a été enregistré (`arrived_at` vide) et que le statut est encore `a_venir`. Sert à mettre le ménage en évidence (badge « Non pointé » + carte surlignée) côté dashboard et mobile.
+
 | Méthode | Endpoint | Description |
 |---|---|---|
 | GET | `/menages?status=&prestataire_user_id=&logement_id=&validated=&unassigned=&manager=me&from=&to=` | Liste filtrable. Chaque ménage inclut un booléen `has_pending_reschedule` (true s'il existe au moins une `menage_reschedule_request` `status='pending'`) — sert à afficher un badge "demande en attente" sur les cards admin. |
@@ -339,6 +346,10 @@ Filtre `unassigned=true` : ne retourne que les ménages sans prestataire (utile 
   "laundry_included": true,
   "laundry_client_price_ht": 15,
   "laundry_provider_price": 8,
+  "n_lit_simple": 1,
+  "n_lit_double": 1,
+  "n_canape_lit": 0,
+  "n_lit_appoint": 0,
   "notes_intervention": "Inclure le nettoyage du four"
 }
 ```
@@ -347,6 +358,9 @@ Filtre `unassigned=true` : ne retourne que les ménages sans prestataire (utile 
 - `client_price_ht` / `client_vat_rate` : prix facturé au client (HT) + taux TVA en %. Calcul TTC à l'affichage.
 - `provider_price` : montant payé au prestataire.
 - `laundry_*` : option linge (si `laundry_included=true`).
+
+**Composition des lits** :
+- `n_lit_simple` / `n_lit_double` / `n_canape_lit` / `n_lit_appoint` (int 0-50, optionnel) — si non fournis, copiés depuis le logement parent. Modifiables ensuite via `PATCH /menages/:id` (admin uniquement, lecture seule côté prestataire).
 
 **Access control sur la réponse** :
 - Admin / manager : voient tous les champs.
@@ -658,6 +672,37 @@ L'upload du fichier lui-même passe par `POST /upload` (multipart) qui retourne 
 
 ---
 
+## Upload de fichiers
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| POST | `/upload` | Upload multipart (champ fichier). Authentifié. Max 10 Mo. |
+| GET | `/files/token/:filename` | Génère une URL de téléchargement signée (token TTL 5 min). Authentifié. |
+| GET | `/files/:filename?t=<token>` | Sert le fichier si le token est valide (pas d'API key requise). |
+
+`POST /upload` réponse `201` :
+```json
+{
+  "url": "https://api.estia-menage.fr/files/<uuid>.jpg",
+  "original_name": "photo.jpg",
+  "file_size": 824513,
+  "mime_type": "image/jpeg"
+}
+```
+
+**Optimisation automatique des images** : tout fichier `image/*` est, à l'upload,
+auto-orienté (EXIF), redimensionné pour tenir dans **2000×2000 px** (sans
+agrandissement), recompressé (qualité ~80, JPEG via mozjpeg) et débarrassé de ses
+métadonnées. `file_size` reflète la taille **après** optimisation. Les fichiers
+non-image sont stockés tels quels.
+
+**Stockage** : piloté par `STORAGE_MODE`. En `local`, les fichiers sont sur le
+disque du serveur et servis directement. En `s3` (Scaleway Object Storage),
+`GET /files/:filename` redirige (302) vers une URL présignée. Le contrat HTTP est
+identique dans les deux modes — le client passe toujours par les routes `/files`.
+
+---
+
 ## Comment
 
 Discussion liée à un ménage, optionnellement scopée à une section.
@@ -669,6 +714,21 @@ Discussion liée à un ménage, optionnellement scopée à une section.
 | POST | `/comments` | Crée un commentaire |
 | PATCH | `/comments/:id` | Édite (auteur uniquement) |
 | DELETE | `/comments/:id` | Supprime (auteur ou edit perm) |
+
+---
+
+## Menage views (badges « non-lus »)
+
+Suivi des consultations par utilisateur pour afficher les badges de non-lus côté dashboard. Un « non-lu » = item créé après la dernière consultation de l'onglet, hors items de l'utilisateur. Seuls `comments`, `comments_steps`, `photos` sont comptés ; `documents`/`emergencies`/`emergencies_claim` renvoient toujours 0 (entités absentes).
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/menage-views/unread-summary` | Totaux : `{ by_menage: {id: n}, by_organization: {id: n} }` (scopé aux ménages visibles) |
+| GET | `/menage-views/unread?menage_id=` | Compteurs détaillés d'un ménage (par onglet + `unread_step_ids`, `unread_emergency_ids`) |
+| POST | `/menage-views` | Marque un onglet comme lu — body `{ menage_id, tab }` → 204 |
+| POST | `/menage-views/item` | Marque un item étape/urgence comme lu — body `{ item_type, item_id }` → 204 (no-op pour l'instant) |
+
+Onglets (`tab`) : `comments`, `comments_steps`, `photos`, `documents`, `emergencies`, `emergencies_claim`.
 
 ---
 

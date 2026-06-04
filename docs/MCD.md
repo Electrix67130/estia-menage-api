@@ -2,7 +2,7 @@
 
 Base : **PostgreSQL 17** · ORM : **Knex 3** · IDs : `uuid` (default `uuid()`).
 
-## Tables (24)
+## Tables (26)
 
 ### `user`
 | Col | Type | Notes |
@@ -85,6 +85,10 @@ Bien locatif paramétrable.
 | **n_kitchens** | int notnull default 1 | |
 | **n_living_rooms** | int notnull default 1 | |
 | **n_exterior_spaces** | int notnull default 0 | terrasses, balcons |
+| **n_lit_simple** | int notnull default 0 | nb lits simples (couchage 1 personne) — défaut copié sur chaque ménage |
+| **n_lit_double** | int notnull default 0 | nb lits doubles (couchage 2 personnes) — défaut copié sur chaque ménage |
+| **n_canape_lit** | int notnull default 0 | nb canapés-lits — défaut copié sur chaque ménage |
+| **n_lit_appoint** | int notnull default 0 | nb lits d'appoint — défaut copié sur chaque ménage |
 | has_basement | boolean default false | |
 | has_laundry | boolean default false | |
 | surface_m2 | int | |
@@ -123,6 +127,10 @@ Prestation de ménage datée.
 | validated_at | timestamp | validation rapport par manager |
 | validated_by | uuid FK user SET NULL | |
 | validated_price | decimal(10,2) | prix final (peut override prix_prevu) |
+| **n_lit_simple** | int notnull default 0 | nb lits simples sur ce ménage (copié du logement à la création, override admin possible) |
+| **n_lit_double** | int notnull default 0 | nb lits doubles sur ce ménage |
+| **n_canape_lit** | int notnull default 0 | nb canapés-lits sur ce ménage |
+| **n_lit_appoint** | int notnull default 0 | nb lits d'appoint sur ce ménage |
 | notes_intervention | text | |
 | archived_at | timestamp | |
 | created_at, updated_at | timestamp | |
@@ -370,6 +378,36 @@ Calendriers externes (iCal Airbnb / Booking / Vrbo) connectés à un logement. U
 | created_at, updated_at | timestamp | |
 
 Note : `menage` porte `external_source` (`cal_<provider>`), `external_event_uid` (UID du VEVENT) et **`external_calendar_id`** (FK `logement_external_calendar`, ON DELETE SET NULL) pour rattacher chaque ménage auto au calendrier précis qui l'a généré. La sync scope création/màj/annulation sur `external_calendar_id` — ainsi deux calendriers du même provider sur un logement ne s'annulent plus mutuellement.
+
+### `error_log`
+Journal des erreurs 500 (« Sentry maison »), alimenté en fire-and-forget par le plugin `error-handler` à chaque erreur inconnue (migration 20260604120000).
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| level | varchar(20) notnull | défaut `error` |
+| message | text notnull | message de l'erreur |
+| stack | text | stack trace (optionnel) |
+| route | text | URL de la requête |
+| method | varchar(10) | méthode HTTP |
+| user_id | uuid FK user SET NULL | null si non authentifié |
+| status_code | int | code HTTP (500) |
+| request_id | varchar(100) | id de requête Fastify |
+| created_at, updated_at | timestamp | INDEX sur `created_at` et `user_id` |
+
+### `menage_view`
+Suivi des consultations par utilisateur → badges « non-lus » du dashboard (migration 20260604130000). Une ligne = la dernière fois qu'un user a ouvert un onglet d'un ménage. Non-lus = items créés après `last_viewed_at`, en excluant les siens. Seuls les onglets `comments`, `comments_steps` (= `comment` avec `section_id`) et `photos` sont calculés ; `documents`/`emergencies`/`emergencies_claim` renvoient 0 (entités absentes).
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| user_id | uuid FK user CASCADE notnull | |
+| menage_id | uuid FK menage CASCADE notnull | |
+| tab | varchar(40) notnull | comments, comments_steps, photos, documents, emergencies, emergencies_claim |
+| last_viewed_at | timestamp notnull | défaut now |
+| created_at, updated_at | timestamp | |
+
+UNIQUE `(user_id, menage_id, tab)` · INDEX `(user_id, menage_id)`.
 
 ---
 

@@ -41,6 +41,8 @@ export type MyUpcomingMenage = {
   horaire_prevu: string | null;
   duree_estimee_min: number | null;
   status: string;
+  /** Calculé : jour passé + aucun pointage + statut a_venir. */
+  needs_attention: boolean;
   /** Réponse personnelle du user appelant, null s'il n'a pas encore répondu. */
   my_response: MenageResponseStatus | null;
   /** true si le user est affecté à ce ménage (table menage_prestataire). */

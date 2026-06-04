@@ -5,6 +5,7 @@ import {
   MenageResponseStatus,
   MyUpcomingMenage,
 } from './menage-response.schema';
+import { computeNeedsAttention, MenageStatus } from '@/modules/menage/menage.schema';
 
 class MenageResponseService {
   constructor(private db: Knex) {}
@@ -87,13 +88,24 @@ class MenageResponseService {
         );
       })
       .where('menage.organization_id', organizationId)
-      .whereNull('menage.archived_at')
-      .whereBetween('menage.date_prevue', [from, to]);
+      .whereNull('menage.archived_at');
 
     if (mode === 'history') {
-      baseQuery.whereIn('menage.status', ['termine', 'valide']);
+      baseQuery
+        .whereBetween('menage.date_prevue', [from, to])
+        .whereIn('menage.status', ['termine', 'valide']);
     } else {
-      baseQuery.whereNotIn('menage.status', ['annule', 'valide']);
+      // Upcoming : ménages dans la fenêtre [from, to] À VENIR, PLUS les
+      // ménages « en retard non pointés » (jour passé, toujours a_venir, aucun
+      // pointage) — sinon le presta ne verrait jamais un ménage qu'il a oublié
+      // de faire (et qu'on veut justement mettre en évidence).
+      baseQuery.whereNotIn('menage.status', ['annule', 'valide']).where(function () {
+        this.whereBetween('menage.date_prevue', [from, to]).orWhere(function () {
+          this.where('menage.status', 'a_venir')
+            .whereNull('menage.arrived_at')
+            .where('menage.date_prevue', '<', today);
+        });
+      });
     }
 
     const rows = (await baseQuery
@@ -125,6 +137,7 @@ class MenageResponseService {
         'menage.horaire_prevu',
         'menage.duree_estimee_min',
         'menage.status',
+        'menage.arrived_at',
         'logement.name as logement_name',
         'logement.address as logement_address',
         'logement.city as logement_city',
@@ -141,9 +154,18 @@ class MenageResponseService {
         ),
         this.db.raw('(menage.prestataire_user_id = ?) as done_by_me', [userId]),
       )
-      .orderBy('menage.date_prevue', 'asc')) as MyUpcomingMenage[];
+      .orderBy('menage.date_prevue', 'asc')) as (Omit<MyUpcomingMenage, 'needs_attention'> & {
+      arrived_at: string | null;
+    })[];
 
-    return rows;
+    return rows.map(({ arrived_at, ...rest }) => ({
+      ...rest,
+      needs_attention: computeNeedsAttention({
+        status: rest.status as MenageStatus,
+        date_prevue: rest.date_prevue,
+        arrived_at,
+      }),
+    }));
   }
 
   /**

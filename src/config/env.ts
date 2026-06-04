@@ -20,6 +20,7 @@ const envSchema = z.object({
   SMTP_FROM: z.string().default('noreply@estiamenage.fr'),
   APP_URL: z.string().default('http://localhost:3001'),
   STORAGE_MODE: z.enum(['local', 's3']).default('local'),
+  S3_ENDPOINT: z.string().default(''),
   S3_BUCKET: z.string().default(''),
   S3_REGION: z.string().default('eu-west-3'),
   S3_ACCESS_KEY: z.string().default(''),

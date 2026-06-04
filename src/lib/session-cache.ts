@@ -24,6 +24,13 @@ export function setCachedSessionId(userId: string, sessionId: string | null): vo
   cache.set(userId, { sessionId, expiresAt: Date.now() + TTL_MS });
 }
 
+// Les clés de cache sont de la forme `${userId}:${platform}` (voir jwt.ts).
+// On purge donc TOUTES les entrées du user (web + mobile), quel que soit le
+// suffixe plateforme — sinon l'invalidation au login/logout est un no-op et un
+// token fraîchement émis est rejeté à tort ("Session expired") jusqu'au TTL.
 export function invalidateSessionCache(userId: string): void {
   cache.delete(userId);
+  for (const key of cache.keys()) {
+    if (key.startsWith(`${userId}:`)) cache.delete(key);
+  }
 }
