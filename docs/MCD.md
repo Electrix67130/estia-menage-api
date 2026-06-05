@@ -2,7 +2,7 @@
 
 Base : **PostgreSQL 17** · ORM : **Knex 3** · IDs : `uuid` (default `uuid()`).
 
-## Tables (26)
+## Tables (28)
 
 ### `user`
 | Col | Type | Notes |
@@ -408,6 +408,35 @@ Suivi des consultations par utilisateur → badges « non-lus » du dashboard (m
 | created_at, updated_at | timestamp | |
 
 UNIQUE `(user_id, menage_id, tab)` · INDEX `(user_id, menage_id)`.
+
+### `logement_consommable`
+Liste de consommables paramétrée par l'admin pour un logement (PQ, savon, capsules…), avec seuil d'alerte (migration 20260605120000). Soft-delete via `archived_at` pour préserver l'historique des relevés.
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| logement_id | uuid FK logement CASCADE notnull | |
+| label | varchar(200) notnull | ex : Papier toilette |
+| unit | varchar(30) | ex : rouleaux, capsules (optionnel) |
+| seuil_alerte | int notnull défaut 1 | stock courant <= seuil → « à racheter » |
+| position | int notnull défaut 0 | |
+| archived_at | timestamp | soft-delete |
+| created_at, updated_at | timestamp | INDEX `(logement_id)` |
+
+### `menage_consommable_releve`
+Relevé saisi par le prestataire au **pointage de fin** : quantité restante de chaque consommable, daté → historique par ménage. Le « stock courant » d'un logement = le relevé le plus récent de chaque consommable.
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| menage_id | uuid FK menage CASCADE notnull | |
+| logement_consommable_id | uuid FK logement_consommable CASCADE notnull | |
+| qty | int notnull | quantité restante (0 = rupture) |
+| recorded_by | uuid FK user SET NULL | qui a relevé |
+| recorded_at | timestamp notnull | |
+| created_at, updated_at | timestamp | |
+
+UNIQUE `(menage_id, logement_consommable_id)` (upsert) · INDEX `(logement_consommable_id)`, `(menage_id)`.
 
 ---
 

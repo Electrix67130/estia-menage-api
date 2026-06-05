@@ -10,12 +10,11 @@ Création des comptes nécessaires :
 
 | Compte | URL | Coût |
 |---|---|---|
-| **Scaleway** (VPS + Object Storage + TEM email) | scaleway.com | 0 € au signup, puis usage |
-| **Cloudflare** (DNS uniquement) | cloudflare.com | Free |
+| **Scaleway** (VPS + Object Storage + TEM email + Domaine/DNS) | scaleway.com | 0 € au signup, puis usage |
 | **Apple Developer** | developer.apple.com | **99 USD/an (~93 €)** payé au signup |
 | **Google Play Console** | play.google.com/console | **25 USD one-shot (~24 €)** |
 | **Sentry** (errors) | sentry.io | Free tier |
-| **Domaine** estia-menage.fr | OVH / Cloudflare Registrar | **~12 €/an** |
+| **Domaine** estia-menage.fr (`.fr` → PAS Cloudflare) | Scaleway Domains / OVH | **~12 €/an** |
 
 **Sous-total fixe immédiat** : ~130 €
 
@@ -23,16 +22,24 @@ Création des comptes nécessaires :
 
 ## 2. Domaine + DNS (30 min)
 
+> ⚠️ **Cloudflare Registrar ne gère PAS les `.fr`** (TLD non supporté). On
+> enregistre donc le domaine chez un registrar qui gère le `.fr` et on garde le
+> DNS au même endroit. Le plus cohérent ici : **Scaleway Domains** (tout dans la
+> même console que le VPS), ou **OVH**. Cloudflare resterait possible *en DNS
+> seul* (délégation de nameservers) mais c'est inutile — on simplifie en 100 %
+> Scaleway.
+
 ```
-1. Acheter estia-menage.fr (OVH 8€/an, Cloudflare Registrar 10€/an).
-2. Transférer la zone DNS sur Cloudflare (gratuit, plus rapide qu'OVH).
+1. Enregistrer estia-menage.fr chez Scaleway (console → Domains & DNS) ou OVH (~8-12€/an).
+2. Gérer la zone DNS chez le même registrar (Scaleway DNS recommandé).
 3. Créer 2 records A (à pointer vers l'IPv4 du VPS Scaleway après déploiement) :
    - api.estia-menage.fr  A  <IP_VPS>
    - app.estia-menage.fr  A  <IP_VPS>
-4. Apex (estia-menage.fr) : laissé non-routé pour l'instant.
+4. Apex (estia-menage.fr) : laissé non-routé pour l'instant (ou CNAME vers le
+   site vitrine Vercel plus tard).
 ```
 
-**Coût** : 12 €/an
+**Coût** : ~12 €/an
 
 ---
 

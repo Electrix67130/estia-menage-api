@@ -717,6 +717,21 @@ Discussion liée à un ménage, optionnellement scopée à une section.
 
 ---
 
+## Consommables (par logement)
+
+Liste de consommables par logement (config admin) + relevé de quantité restante à chaque pointage de fin par le prestataire. Indicateur « à racheter » quand le stock courant ≤ seuil.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/logement-consommables?logement_id=` | Liste active + **stock courant** (dernier relevé) + `needs_restock` par item |
+| POST | `/logement-consommables` | Crée un consommable (admin) — body `{ logement_id, label, unit?, seuil_alerte?, position? }` |
+| PATCH | `/logement-consommables/:id` | Modifie (admin) |
+| DELETE | `/logement-consommables/:id` | Soft-delete via `archived_at` (admin) — préserve l'historique |
+| GET | `/menages/:id/consommables` | Liste du logement + quantité relevée pour CE ménage (`qty` null si non saisi) |
+| PUT | `/menages/:id/consommables` | Relevé au pointage de fin — body `{ items: [{ logement_consommable_id, qty }] }` (prestataire assigné ou admin) |
+
+Chaque **logement** sérialisé (liste + détail) inclut `consommables_alert` (nombre de consommables sous le seuil) → badge « à racheter » côté dashboard/mobile.
+
 ## Menage views (badges « non-lus »)
 
 Suivi des consultations par utilisateur pour afficher les badges de non-lus côté dashboard. Un « non-lu » = item créé après la dernière consultation de l'onglet, hors items de l'utilisateur. Seuls `comments`, `comments_steps`, `photos` sont comptés ; `documents`/`emergencies`/`emergencies_claim` renvoient toujours 0 (entités absentes).

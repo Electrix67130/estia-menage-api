@@ -3,6 +3,7 @@ import { z } from 'zod';
 import LogementService from './logement.service';
 import { createLogementSchema, updateLogementSchema, LogementRow } from './logement.schema';
 import LogementRoomService from '@/modules/logement-room/logement-room.service';
+import { computeConsommableAlerts } from '@/modules/logement-consommable/logement-consommable.service';
 import { getActiveMembership } from '@/lib/active-membership';
 import { geocodeAddress } from '@/lib/geocode';
 
@@ -53,7 +54,24 @@ export default fp(
         });
       }
       const restrictToMember = membership.role !== 'admin' ? request.user.sub : undefined;
-      return service.findActiveByOrg(membership.organization_id, pagination, restrictToMember);
+      const result = await service.findActiveByOrg(
+        membership.organization_id,
+        pagination,
+        restrictToMember,
+      );
+      // Flag "consommables à racheter" : nb de consommables sous le seuil
+      // (stock courant), par logement.
+      const alerts = await computeConsommableAlerts(
+        fastify.db,
+        result.data.map((l) => l.id),
+      );
+      return {
+        ...result,
+        data: result.data.map((l) => ({
+          ...l,
+          consommables_alert: alerts.get(l.id) ?? 0,
+        })),
+      };
     });
 
     // GET /logements/:id — admin OK ; non-admin doit être membre du logement
@@ -71,7 +89,8 @@ export default fp(
           .first();
         if (!isMember) return reply.notFound('Logement not found');
       }
-      return logement;
+      const alerts = await computeConsommableAlerts(fastify.db, [id]);
+      return { ...logement, consommables_alert: alerts.get(id) ?? 0 };
     });
 
     // POST /logements — admin only

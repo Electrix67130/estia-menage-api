@@ -122,4 +122,6 @@ export type LogementRow = {
   archived_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Calculé : nb de consommables sous le seuil (stock courant). 0 = OK. */
+  consommables_alert?: number;
 };
