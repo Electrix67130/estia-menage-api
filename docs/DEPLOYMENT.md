@@ -467,21 +467,28 @@ chmod +x /home/estia/deploy.sh
 ## 10. CI/CD GitHub Actions (1h)
 
 Les workflows sont **déjà dans les repos** (`.github/workflows/deploy.yml` côté
-API **et** côté dashboard). Sur push `master` : gate `tsc --noEmit`, puis SSH sur
-le VPS qui lance `/home/estia/deploy.sh` (lequel `git pull` + rebuild **API
-Docker + dashboard** — un push sur l'un ou l'autre resynchronise les deux). Un
-verrou `concurrency: deploy-vps` empêche deux déploiements simultanés.
+API **et** côté dashboard). **Déclenchement par tag** : sur push d'un tag `v*`
+(ex. `v1.0.0`), gate `tsc --noEmit`, puis SSH sur le VPS qui lance le script
+dédié du repo (`/home/estia/deploy-api.sh` ou `deploy-dashboard.sh`) avec le
+**tag exact** → le serveur fait `git checkout <tag>` + rebuild. Un push sur
+`master` **ne déploie pas** ; on déploie une version délibérément via un tag.
+Un verrou `concurrency: deploy-vps` empêche deux déploiements simultanés.
+
+**Déployer = taguer une version :**
+```bash
+# dans estia-menage-api ou estia-menage-dashboard
+git tag v1.0.0 && git push origin v1.0.0
+```
+(Un run manuel reste possible via Actions → Run workflow → déploie `master`.)
 
 - **Secrets GitHub à configurer dans CHAQUE repo** (Settings → Secrets and
   variables → Actions) : `SSH_HOST`, `SSH_USER` (= `estia`), `SSH_PRIVATE_KEY`
   (clé privée dont la publique est dans `~estia/.ssh/authorized_keys`),
   `SSH_PORT` (optionnel, défaut 22).
-- **Activation** : tant que le VPS n'existe pas, le job `deploy` est **désactivé**
-  (seul le typecheck tourne). Quand le VPS est prêt et les secrets renseignés,
-  ajouter la **variable** de repo `DEPLOY_ENABLED=true` (onglet *Variables*) dans
-  chaque repo pour activer le déploiement automatique.
-- **Prérequis VPS** : `/home/estia/deploy.sh` exécutable ; accès lecture aux
-  repos pour `git pull` (deploy key si repos privés) ; `sudo` NOPASSWD pour
+- **Activation** : le job `deploy` ne tourne que si la **variable** de repo
+  `DEPLOY_ENABLED=true` est posée (onglet *Variables*) dans chaque repo.
+- **Prérequis VPS** : `/home/estia/deploy-api.sh` et `/home/estia/deploy-dashboard.sh`
+  exécutables ; accès lecture aux repos GitHub ; `sudo` NOPASSWD pour
   `systemctl restart estia-dashboard`.
 - **Mobile** : optionnel, EAS auto-builds via `eas-cli` quand on tag une version.
   Pour la phase pilote, builds manuels suffisent

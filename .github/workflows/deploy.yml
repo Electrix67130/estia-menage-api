@@ -18,13 +18,8 @@ name: Deploy API (test)
 
 on:
   push:
-    branches: [master]
-    # On évite de redéployer pour des changements purement docs/CI.
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-      - '.github/**'
-  workflow_dispatch: {}
+    tags: ['v*']        # déploiement déclenché par un tag de version (ex: v1.0.0)
+  workflow_dispatch: {} # ou run manuel (déploie master)
 
 # Un seul déploiement à la fois sur le VPS (API et dashboard partagent le verrou).
 concurrency:
@@ -62,4 +57,4 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           command_timeout: 20m
           script_stop: true
-          script: /home/estia/deploy.sh
+          script: /home/estia/deploy-api.sh ${{ github.ref_name }}
