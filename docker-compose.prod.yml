@@ -56,7 +56,11 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - estia_db_data:/var/lib/postgresql/data
-    # Pas de `ports:` → Postgres n'est jamais exposé hors du VPS.
+    # Publié UNIQUEMENT sur le localhost du VPS (jamais 0.0.0.0) → accessible
+    # seulement depuis le serveur lui-même ou via un tunnel SSH (ex. DataGrip).
+    # Reste injoignable de l'extérieur (bind 127.0.0.1 + firewall).
+    ports:
+      - "127.0.0.1:5432:5432"
     networks:
       - estia_menage_prod
     healthcheck:
