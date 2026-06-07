@@ -4,7 +4,7 @@
 # migrate + up, cf. docs/DEPLOYMENT.md §3.8/§4.4).
 #
 # Secrets GitHub requis (Settings → Secrets and variables → Actions) :
-#   SSH_HOST         IP ou hostname du VPS (ex. api.estia-menage.fr)
+#   SSH_HOST         IP ou hostname du VPS (ex. api.estia-clean-connect.fr)
 #   SSH_USER         utilisateur de déploiement (ex. estia)
 #   SSH_PRIVATE_KEY  clé privée SSH dont la publique est dans
 #                    ~estia/.ssh/authorized_keys sur le VPS

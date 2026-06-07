@@ -14,7 +14,7 @@ Création des comptes nécessaires :
 | **Apple Developer** | developer.apple.com | **99 USD/an (~93 €)** payé au signup |
 | **Google Play Console** | play.google.com/console | **25 USD one-shot (~24 €)** |
 | **Sentry** (errors) | sentry.io | Free tier |
-| **Domaine** estia-menage.fr (`.fr` → PAS Cloudflare) | Scaleway Domains / OVH | **~12 €/an** |
+| **Domaine** estia-clean-connect.fr (`.fr` → PAS Cloudflare) | Scaleway Domains / OVH | **~12 €/an** |
 
 **Sous-total fixe immédiat** : ~130 €
 
@@ -30,12 +30,12 @@ Création des comptes nécessaires :
 > Scaleway.
 
 ```
-1. Enregistrer estia-menage.fr chez Scaleway (console → Domains & DNS) ou OVH (~8-12€/an).
+1. Enregistrer estia-clean-connect.fr chez Scaleway (console → Domains & DNS) ou OVH (~8-12€/an).
 2. Gérer la zone DNS chez le même registrar (Scaleway DNS recommandé).
 3. Créer 2 records A (à pointer vers l'IPv4 du VPS Scaleway après déploiement) :
-   - api.estia-menage.fr  A  <IP_VPS>
-   - app.estia-menage.fr  A  <IP_VPS>
-4. Apex (estia-menage.fr) : laissé non-routé pour l'instant (ou CNAME vers le
+   - api.estia-clean-connect.fr  A  <IP_VPS>
+   - app.estia-clean-connect.fr  A  <IP_VPS>
+4. Apex (estia-clean-connect.fr) : laissé non-routé pour l'instant (ou CNAME vers le
    site vitrine Vercel plus tard).
 ```
 
@@ -64,9 +64,9 @@ Création des comptes nécessaires :
 8. Create.
 ```
 
-Une IPv4 publique est attribuée. Pointer le DNS Cloudflare :
+Une IPv4 publique est attribuée. Pointer le DNS (Scaleway) :
 ```
-api.estia-menage.fr   A   <IP_publique_scaleway>   Proxied=OFF
+api.estia-clean-connect.fr   A   <IP_publique_scaleway>   Proxied=OFF
 ```
 
 ### 3.2 Hardening initial
@@ -165,7 +165,7 @@ sudo apt update
 sudo apt install -y caddy
 
 sudo tee /etc/caddy/Caddyfile >/dev/null <<'EOF'
-api.estia-menage.fr {
+api.estia-clean-connect.fr {
     reverse_proxy localhost:3000
     encode gzip zstd
 }
@@ -175,7 +175,7 @@ sudo systemctl reload caddy
 ```
 
 → Let's Encrypt est obtenu automatiquement par Caddy. Vérifie :
-`curl https://api.estia-menage.fr/health`
+`curl https://api.estia-clean-connect.fr/health`
 
 ### 3.7 Backups quotidiens vers Object Storage
 
@@ -251,7 +251,7 @@ sudo -u estia npm ci
 # que API_KEY dans le .env de l'API (le dashboard l'envoie en en-tête x-api-key ;
 # sans elle, tous les appels API repartent en 401).
 sudo -u estia tee /home/estia/dashboard/.env.production >/dev/null <<EOF
-NEXT_PUBLIC_API_URL=https://api.estia-menage.fr
+NEXT_PUBLIC_API_URL=https://api.estia-clean-connect.fr
 NEXT_PUBLIC_API_KEY=<MEME_VALEUR_QUE_API_KEY_DE_L_API>
 EOF
 
@@ -293,12 +293,12 @@ sudo systemctl status estia-dashboard
 
 ```bash
 sudo tee /etc/caddy/Caddyfile >/dev/null <<'EOF'
-api.estia-menage.fr {
+api.estia-clean-connect.fr {
     reverse_proxy localhost:3000
     encode gzip zstd
 }
 
-app.estia-menage.fr {
+app.estia-clean-connect.fr {
     reverse_proxy localhost:3001
     encode gzip zstd
 }
@@ -307,7 +307,7 @@ EOF
 sudo systemctl reload caddy
 ```
 
-→ Vérifie : `curl -I https://app.estia-menage.fr` (devrait répondre 200).
+→ Vérifie : `curl -I https://app.estia-clean-connect.fr` (devrait répondre 200).
 
 ### 4.4 Étendre `deploy.sh` pour redéployer le dashboard aussi
 
@@ -402,7 +402,7 @@ chmod +x /home/estia/deploy.sh
    - S3_BUCKET = estia-menage-photos
    - S3_ACCESS_KEY = <SCW_ACCESS_KEY>
    - S3_SECRET_KEY = <SCW_SECRET_KEY>
-6. Optionnel : custom domain "photos.estia-menage.fr" (CNAME vers le bucket).
+6. Optionnel : custom domain "photos.estia-clean-connect.fr" (CNAME vers le bucket).
 ```
 
 **Coût** :
@@ -418,11 +418,11 @@ chmod +x /home/estia/deploy.sh
 
 ```
 1. Console Scaleway → Transactional Email → Activate.
-2. Ajouter le domaine estia-menage.fr → Scaleway donne :
+2. Ajouter le domaine estia-clean-connect.fr → Scaleway donne :
    - 1 record SPF (TXT)
    - 1 record DKIM (TXT)
    - 1 record MX (optionnel, pour recevoir les bounces)
-3. Ajouter ces records dans Cloudflare DNS, attendre la validation
+3. Ajouter ces records dans le DNS (Scaleway), attendre la validation
    (quelques minutes à quelques heures).
 4. Console → Transactional Email → SMTP Credentials → Generate.
    Récupérer :
@@ -435,7 +435,7 @@ chmod +x /home/estia/deploy.sh
    - SMTP_PORT=587
    - SMTP_USER=<project_id>
    - SMTP_PASSWORD=<api_secret>
-   - EMAIL_FROM="Estia Ménage <noreply@estia-menage.fr>"
+   - EMAIL_FROM="Estia Ménage <noreply@estia-clean-connect.fr>"
 6. Tester l'envoi depuis l'API (invitation, reset password…).
 ```
 
@@ -500,7 +500,7 @@ verrou `concurrency: deploy-vps` empêche deux déploiements simultanés.
 
 | Poste | Coût HT/an |
 |---|---|
-| Domaine estia-menage.fr | 12 € |
+| Domaine estia-clean-connect.fr | 12 € |
 | Apple Developer | 93 € |
 | Scaleway VPS PLAY2-MICRO + IPv4 (API + Dashboard + Postgres + Caddy) | ~120 € |
 | Scaleway Object Storage (photos + backups) | 0 € (< 75 GB free) |
@@ -530,7 +530,7 @@ verrou `concurrency: deploy-vps` empêche deux déploiements simultanés.
 
 | Poste | Coût HT/an | Détail |
 |---|---|---|
-| Domaine estia-menage.fr | 12 € | identique |
+| Domaine estia-clean-connect.fr | 12 € | identique |
 | Apple Developer | 93 € | identique |
 | Scaleway VPS PRO2-XS (API + Dashboard) | ~300 € | 4 vCPU, 16 GB — ~25 €/mois |
 | Scaleway Postgres managé (DB-DEV-XS) | ~180 € | 2 vCPU, 4 GB, backups auto, HA opt. — ~15 €/mois |
@@ -561,7 +561,7 @@ verrou `concurrency: deploy-vps` empêche deux déploiements simultanés.
 
 ## Temps de setup total
 
-- **Domaine + DNS Cloudflare** : 30 min
+- **Domaine + DNS (Scaleway)** : 30 min
 - **Scaleway VPS + Docker (API + Postgres conteneurisés) + Caddy** : 2-3h
 - **Self-host dashboard Next.js (build + systemd + Caddy)** : 45 min
 - **Scaleway Object Storage (photos + backups)** : 15 min
@@ -580,7 +580,7 @@ verrou `concurrency: deploy-vps` empêche deux déploiements simultanés.
 
 1. **J0** : Acheter domaine + Apple Developer + Google Play
    (lancer l'activation Apple en premier, c'est le plus long).
-2. **J0** : Setup Cloudflare DNS + Sentry pendant l'attente Apple.
+2. **J0** : Setup DNS (Scaleway) + Sentry pendant l'attente Apple.
 3. **J0** : Provisionner Scaleway VPS + Object Storage + TEM (sections 3 + 7 + 8).
 4. **J0** : Déployer l'API + le dashboard self-hosted sur le VPS (sections 3 + 4).
 5. **J0** : Inviter Estia sur le dashboard, créer leurs comptes admin.
@@ -604,8 +604,8 @@ verrou `concurrency: deploy-vps` empêche deux déploiements simultanés.
 - **Mises à jour OS** : `unattended-upgrades` installé en §3.2 → patch de sécurité
   appliqués automatiquement.
 - **Monitoring** : Sentry pour les erreurs applicatives. Pour l'uptime, ajouter
-  **UptimeRobot** (free, 50 monitors) qui ping `https://api.estia-menage.fr/health`
-  et `https://app.estia-menage.fr/` toutes les 5 min.
+  **UptimeRobot** (free, 50 monitors) qui ping `https://api.estia-clean-connect.fr/health`
+  et `https://app.estia-clean-connect.fr/` toutes les 5 min.
 - **RGPD** : prévoir une mention dans l'app + une page "politique de
   confidentialité" hébergée quelque part (peut être une route statique du
   dashboard). **Non** obligatoire pour TestFlight et Play Internal Testing,

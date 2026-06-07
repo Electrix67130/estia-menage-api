@@ -683,7 +683,7 @@ L'upload du fichier lui-même passe par `POST /upload` (multipart) qui retourne 
 `POST /upload` réponse `201` :
 ```json
 {
-  "url": "https://api.estia-menage.fr/files/<uuid>.jpg",
+  "url": "https://api.estia-clean-connect.fr/files/<uuid>.jpg",
   "original_name": "photo.jpg",
   "file_size": 824513,
   "mime_type": "image/jpeg"
