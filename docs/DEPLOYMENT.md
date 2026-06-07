@@ -418,25 +418,20 @@ chmod +x /home/estia/deploy.sh
 
 ```
 1. Console Scaleway → Transactional Email → Activate.
-2. Ajouter le domaine estia-clean-connect.fr → Scaleway donne :
-   - 1 record SPF (TXT)
-   - 1 record DKIM (TXT)
-   - 1 record MX (optionnel, pour recevoir les bounces)
-3. Ajouter ces records dans le DNS (Scaleway), attendre la validation
-   (quelques minutes à quelques heures).
-4. Console → Transactional Email → SMTP Credentials → Generate.
-   Récupérer :
-   - SMTP_HOST = smtp.tem.scw.cloud
-   - SMTP_PORT = 587 (STARTTLS) ou 2465 (TLS)
-   - SMTP_USERNAME = <project_id>
-   - SMTP_PASSWORD = <api_secret>
-5. Côté API .env (sur le VPS) :
-   - SMTP_HOST=smtp.tem.scw.cloud
-   - SMTP_PORT=587
+2. Ajouter le domaine estia-clean-connect.fr (domaine Scaleway → "Configurer
+   les DNS automatiquement" pose SPF/DKIM/DMARC tout seul). Attendre que le
+   domaine passe **vérifié**.
+3. Clé API : créer une **clé dédiée** (IAM → Application `tem-email` + policy
+   `TransactionalEmailFullAccess` → API key). Son **Secret** = mot de passe SMTP.
+   (Le `SMTP_USER` = l'**ID de projet** fourni par TEM.)
+4. Côté API .env (sur le VPS) :
+   - SMTP_HOST=smtp.tem.scaleway.com   ← `.scaleway.com`, pas `.scw.cloud`
+   - **SMTP_PORT=2587** ⚠️ Scaleway BLOQUE 25/465/587 en sortie → port
+     alternatif **2587** (STARTTLS) ou 2465 (TLS).
    - SMTP_USER=<project_id>
-   - SMTP_PASSWORD=<api_secret>
-   - EMAIL_FROM="Estia Ménage <noreply@estia-clean-connect.fr>"
-6. Tester l'envoi depuis l'API (invitation, reset password…).
+   - SMTP_PASSWORD=<secret de la clé API dédiée>
+   - SMTP_FROM=noreply@estia-clean-connect.fr
+5. Tester l'envoi (`transporter.verify()` puis un vrai `sendMail`).
 ```
 
 **Coût** :
