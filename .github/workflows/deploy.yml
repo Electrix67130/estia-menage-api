@@ -18,7 +18,7 @@ name: Deploy API (test)
 
 on:
   push:
-    tags: ['v*']        # déploiement déclenché par un tag de version (ex: v1.0.0)
+    tags: ['[0-9]*']    # déploiement déclenché par un tag de version (ex: 1.0.0, sans "v")
   workflow_dispatch: {} # ou run manuel (déploie master)
 
 # Un seul déploiement à la fois sur le VPS (API et dashboard partagent le verrou).

@@ -462,8 +462,9 @@ chmod +x /home/estia/deploy.sh
 ## 10. CI/CD GitHub Actions (1h)
 
 Les workflows sont **déjà dans les repos** (`.github/workflows/deploy.yml` côté
-API **et** côté dashboard). **Déclenchement par tag** : sur push d'un tag `v*`
-(ex. `v1.0.0`), gate `tsc --noEmit`, puis SSH sur le VPS qui lance le script
+API **et** côté dashboard). **Déclenchement par tag** : sur push d'un tag
+numérique `[0-9]*` (ex. `1.0.0`, **sans `v`**), gate `tsc --noEmit`, puis SSH
+sur le VPS qui lance le script
 dédié du repo (`/home/estia/deploy-api.sh` ou `deploy-dashboard.sh`) avec le
 **tag exact** → le serveur fait `git checkout <tag>` + rebuild. Un push sur
 `master` **ne déploie pas** ; on déploie une version délibérément via un tag.
@@ -472,7 +473,7 @@ Un verrou `concurrency: deploy-vps` empêche deux déploiements simultanés.
 **Déployer = taguer une version :**
 ```bash
 # dans estia-menage-api ou estia-menage-dashboard
-git tag v1.0.0 && git push origin v1.0.0
+git tag 1.0.0 && git push origin 1.0.0
 ```
 (Un run manuel reste possible via Actions → Run workflow → déploie `master`.)
 
