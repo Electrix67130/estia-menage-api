@@ -1,8 +1,17 @@
 import { z } from 'zod';
 
+// Politique mot de passe : min 12 caractères, au moins 1 lettre et 1 chiffre.
+// (la longueur est le facteur clé ; pas d'obligation maj/symbole pour l'UX)
+const passwordSchema = z
+  .string()
+  .min(12, 'Le mot de passe doit faire au moins 12 caractères')
+  .max(128)
+  .regex(/\p{L}/u, 'Le mot de passe doit contenir au moins une lettre')
+  .regex(/[0-9]/, 'Le mot de passe doit contenir au moins un chiffre');
+
 export const registerSchema = z.object({
   email: z.string().email().max(255),
-  password: z.string().min(8).max(128),
+  password: passwordSchema,
   first_name: z.string().min(1).max(100),
   last_name: z.string().min(1).max(100),
   phone: z.string().min(1).max(20),
@@ -32,7 +41,7 @@ export const registerSchema = z.object({
 
 export const updatePasswordSchema = z.object({
   current_password: z.string().min(1),
-  new_password: z.string().min(8).max(128),
+  new_password: passwordSchema,
 });
 
 export const platformEnum = z.enum(['mobile', 'web']);
@@ -54,7 +63,7 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(1),
-  new_password: z.string().min(8).max(128),
+  new_password: passwordSchema,
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
