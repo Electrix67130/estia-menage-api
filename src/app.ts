@@ -13,6 +13,7 @@ import apiKey from './plugins/api-key';
 import jwtPlugin from './plugins/jwt';
 import uploadPlugin from './plugins/upload';
 import websocketPlugin from './plugins/websocket';
+import { renderInvitePage, renderResetPasswordPage } from './lib/web-pages';
 
 interface AppOptions extends FastifyServerOptions {
   logLevel?: string;
@@ -36,6 +37,7 @@ function buildApp(opts: AppOptions = {}) {
   // File handling
   app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB max
   app.register(fastifyStatic, { root: path.join(__dirname, '..', 'uploads'), prefix: '/uploads/', decorateReply: true });
+  app.register(fastifyStatic, { root: path.join(__dirname, '..', 'assets'), prefix: '/assets/', decorateReply: false });
 
   // Infrastructure plugins
   app.register(database);
@@ -54,6 +56,16 @@ function buildApp(opts: AppOptions = {}) {
 
   // Health check
   app.get('/health', async () => ({ status: 'ok' }));
+
+  // Pages web publiques (pont email -> app mobile via deep link)
+  app.get('/invite/:token', async (request, reply) => {
+    const { token } = request.params as { token: string };
+    reply.type('text/html').send(renderInvitePage(token));
+  });
+  app.get('/reset-password/:token', async (request, reply) => {
+    const { token } = request.params as { token: string };
+    reply.type('text/html').send(renderResetPasswordPage(token));
+  });
 
   return app;
 }

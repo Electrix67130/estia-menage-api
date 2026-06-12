@@ -16,16 +16,19 @@ export function signFileUrl(fileUrl: string): string {
   return `${env.APP_URL}/files/${filename}?t=${token}`;
 }
 
+/** Sign the given fields of a single object if they point to an internal /files/ URL. */
+export function signFields<T extends Record<string, unknown>>(item: T, fields: string[]): T {
+  const signed = { ...item };
+  for (const field of fields) {
+    const val = signed[field];
+    if (typeof val === 'string' && val.includes('/files/')) {
+      (signed as Record<string, unknown>)[field] = signFileUrl(val);
+    }
+  }
+  return signed;
+}
+
 /** Sign all url/thumbnail_url fields in an array of objects */
 export function signUrlsInList<T extends Record<string, unknown>>(items: T[], fields: string[] = ['url', 'thumbnail_url']): T[] {
-  return items.map((item) => {
-    const signed = { ...item };
-    for (const field of fields) {
-      const val = signed[field];
-      if (typeof val === 'string' && val.includes('/files/')) {
-        (signed as Record<string, unknown>)[field] = signFileUrl(val);
-      }
-    }
-    return signed;
-  });
+  return items.map((item) => signFields(item, fields));
 }

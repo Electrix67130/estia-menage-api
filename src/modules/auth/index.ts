@@ -4,6 +4,7 @@ import { z } from 'zod';
 import AuthService from './auth.service';
 import { registerSchema, loginSchema, refreshSchema, updatePasswordSchema, forgotPasswordSchema, resetPasswordSchema } from './auth.schema';
 import OrganizationMemberService from '../organization-member/organization-member.service';
+import { signFields } from '@/lib/sign-url';
 
 const switchOrganizationSchema = z.object({
   organization_id: z.string().uuid(),
@@ -73,7 +74,7 @@ export default fp(
         : memberships[0];
 
       return {
-        ...safeUser,
+        ...signFields(safeUser, ['avatar_url']),
         role: active?.role ?? null,
         organization_id: active?.organization_id ?? null,
         active_organization_id: user.active_organization_id ?? null,

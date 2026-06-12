@@ -3,6 +3,7 @@ import { z } from 'zod';
 import MenagePrestataireService from './menage-prestataire.service';
 import { setMenagePrestatairesSchema } from './menage-prestataire.schema';
 import { getActiveMembership } from '@/lib/active-membership';
+import { notifyMenageAssignment } from '@/lib/push';
 
 const menageIdParam = z.object({ id: z.string().uuid() });
 const menageUserIdParam = z.object({
@@ -96,8 +97,22 @@ export default fp(
             });
           }
         }
+        // Prestataires deja affectes avant le remplacement, pour ne notifier que les nouveaux.
+        const before = (await fastify.db('menage_prestataire')
+          .where({ menage_id: id })
+          .select('user_id')) as { user_id: string }[];
+        const beforeSet = new Set(before.map((r) => r.user_id));
+
         await service.setMenagePrestataires(id, prestataire_user_ids);
         const data = await service.findByMenage(id);
+
+        const newlyAssigned = prestataire_user_ids.filter(
+          (u) => !beforeSet.has(u) && u !== request.user.sub,
+        );
+        notifyMenageAssignment(fastify.db, id, newlyAssigned).catch((err) =>
+          fastify.log.error({ err }, 'push assignment failed'),
+        );
+
         return { data };
       },
     );
@@ -132,8 +147,18 @@ export default fp(
             message: "Le prestataire doit appartenir à l'organisation",
           });
         }
+        const alreadyAssigned = await fastify.db('menage_prestataire')
+          .where({ menage_id: id, user_id })
+          .first();
         await service.addPrestataire(id, user_id);
         const data = await service.findByMenage(id);
+
+        if (!alreadyAssigned && user_id !== request.user.sub) {
+          notifyMenageAssignment(fastify.db, id, [user_id]).catch((err) =>
+            fastify.log.error({ err }, 'push assignment failed'),
+          );
+        }
+
         return { data };
       },
     );

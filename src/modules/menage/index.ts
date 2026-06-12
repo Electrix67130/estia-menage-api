@@ -16,6 +16,8 @@ import {
   requirePermissionForLogement,
 } from '@/lib/permissions';
 import { emitToMenage } from '@/lib/realtime-hub';
+import { notifyMenageAssignment } from '@/lib/push';
+import { signUrlsInList } from '@/lib/sign-url';
 
 const uuidSchema = z.object({ id: z.string().uuid() });
 
@@ -126,7 +128,7 @@ export default fp(
             ),
           )
           .orderBy('user.first_name', 'asc');
-        return { data };
+        return { data: signUrlsInList(data, ['avatar_url']) };
       },
     );
 
@@ -239,6 +241,13 @@ export default fp(
         const presta = new MenagePrestataireService(fastify.db);
         const userIds = data.prestataire_user_id ? [data.prestataire_user_id] : [];
         await presta.setMenagePrestataires(id, userIds);
+
+        // Notif push au prestataire nouvellement affecte (hors auteur).
+        if (data.prestataire_user_id && data.prestataire_user_id !== request.user.sub) {
+          notifyMenageAssignment(fastify.db, id, [data.prestataire_user_id]).catch((err) =>
+            fastify.log.error({ err }, 'push assignment (patch) failed'),
+          );
+        }
       }
 
       return menage;

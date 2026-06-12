@@ -3,7 +3,8 @@ import { z } from 'zod';
 import CommentService from './comment.service';
 import { createCommentSchema, updateCommentSchema } from './comment.schema';
 import { requirePermissionForMenage } from '@/lib/permissions';
-import { emitToMenage } from '@/lib/realtime-hub';
+import { emitToMenage, getMenageRecipientIds } from '@/lib/realtime-hub';
+import { sendPushToUsers } from '@/lib/push';
 
 const byMenageSchema = z.object({
   menage_id: z.string().uuid(),
@@ -67,6 +68,23 @@ export default fp(
         resource_id: comment.id,
         actor_id: request.user.sub,
       }).catch((err) => fastify.log.error({ err }, 'WS emit failed'));
+
+      // Notification push aux participants du menage (hors auteur).
+      (async () => {
+        const recipients = await getMenageRecipientIds(fastify.db, data.menage_id, request.user.sub);
+        if (recipients.length === 0) return;
+        const author = await fastify.db('user')
+          .where({ id: request.user.sub })
+          .select('first_name', 'last_name')
+          .first();
+        const name = author ? `${author.first_name} ${author.last_name}`.trim() : 'Quelqu’un';
+        await sendPushToUsers(fastify.db, recipients, {
+          title: 'Nouveau commentaire',
+          body: `${name} a commenté un ménage.`,
+          data: { menage_id: data.menage_id, type: 'comment' },
+        });
+      })().catch((err) => fastify.log.error({ err }, 'push comment failed'));
+
       return reply.code(201).send(comment);
     });
 

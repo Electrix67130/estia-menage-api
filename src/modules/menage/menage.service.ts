@@ -3,6 +3,7 @@ import BaseService, { PaginatedResult } from '@/lib/base-service';
 import { MenageRow, ListMenagesQuery } from './menage.schema';
 import { generateChecklistForMenage } from '@/modules/menage-check/menage-check.service';
 import { LogementRow } from '@/modules/logement/logement.schema';
+import { signFields, signUrlsInList } from '@/lib/sign-url';
 
 interface FindOptions extends Omit<ListMenagesQuery, 'manager'> {
   managerUserId?: string;
@@ -19,7 +20,7 @@ class MenageService extends BaseService<MenageRow> {
    * Préférer à `findById` quand on a besoin du nom du prestataire dans l'UI.
    */
   async findByIdWithPrestataire(id: string): Promise<MenageRow | undefined> {
-    return this.db('menage')
+    const row = (await this.db('menage')
       .leftJoin('user as prestataire', 'menage.prestataire_user_id', 'prestataire.id')
       .leftJoin('logement', 'menage.logement_id', 'logement.id')
       .where('menage.id', id)
@@ -37,7 +38,8 @@ class MenageService extends BaseService<MenageRow> {
         this.db.raw(
           "EXISTS (SELECT 1 FROM menage_reschedule_request mrr WHERE mrr.menage_id = menage.id AND mrr.status = 'pending') as has_pending_reschedule",
         ),
-      ) as Promise<MenageRow | undefined>;
+      )) as MenageRow | undefined;
+    return row ? signFields(row, ['prestataire_avatar_url']) : row;
   }
 
   async findActive(
@@ -117,7 +119,7 @@ class MenageService extends BaseService<MenageRow> {
     const count = countResult[0].count;
 
     return {
-      data,
+      data: signUrlsInList(data, ['prestataire_avatar_url']),
       meta: {
         total: parseInt(count, 10),
         page,

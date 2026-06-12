@@ -2,7 +2,7 @@
 
 Base : **PostgreSQL 17** · ORM : **Knex 3** · IDs : `uuid` (default `uuid()`).
 
-## Tables (28)
+## Tables (29)
 
 ### `user`
 | Col | Type | Notes |
@@ -438,6 +438,17 @@ Relevé saisi par le prestataire au **pointage de fin** : quantité restante de 
 
 UNIQUE `(menage_id, logement_consommable_id)` (upsert) · INDEX `(logement_consommable_id)`, `(menage_id)`.
 
+### `device_token`
+Tokens push Expo par appareil (multi-device) pour les notifications push (migration 20260613000000). Upsert sur `token` ; purge auto des tokens invalides (`DeviceNotRegistered`) à l'envoi.
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| user_id | uuid FK user CASCADE notnull | |
+| token | text unique notnull | `ExponentPushToken[...]` |
+| platform | varchar(16) | `ios` / `android` |
+| created_at, updated_at | timestamp | INDEX `(user_id)` |
+
 ---
 
 ## Évolutions de tables existantes
@@ -502,6 +513,7 @@ organization (id)
 
 user
 ├─ refresh_token
+├─ device_token (user_id) — tokens push Expo (multi-device)
 └─ menage (prestataire_user_id, validated_by)
 ```
 

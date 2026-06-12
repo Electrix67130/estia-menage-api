@@ -1,6 +1,7 @@
 import { Knex } from 'knex';
 import BaseService, { PaginationOptions, PaginatedResult } from '@/lib/base-service';
 import { CommentRow } from './comment.schema';
+import { signUrlsInList } from '@/lib/sign-url';
 
 class CommentService extends BaseService<CommentRow> {
   constructor(db: Knex) {
@@ -38,7 +39,7 @@ class CommentService extends BaseService<CommentRow> {
     ]);
 
     return {
-      data: items,
+      data: signUrlsInList(items, ['avatar_url']),
       meta: {
         total: parseInt(count, 10),
         page,

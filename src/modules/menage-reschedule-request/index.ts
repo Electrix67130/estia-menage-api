@@ -7,6 +7,7 @@ import {
   listRescheduleRequestsSchema,
 } from './menage-reschedule-request.schema';
 import { getActiveMembership } from '@/lib/active-membership';
+import { sendPushToUsers } from '@/lib/push';
 
 const uuidSchema = z.object({ id: z.string().uuid() });
 
@@ -102,6 +103,30 @@ export default fp(
           proposed_time: data.proposed_time ?? null,
           reason: data.reason ?? null,
         });
+
+        // Notification push aux admins de l'organisation.
+        (async () => {
+          const admins = (await fastify.db('organization_member')
+            .where({ organization_id: menage.organization_id, role: 'admin' })
+            .select('user_id')) as { user_id: string }[];
+          const recipients = admins.map((a) => a.user_id).filter((uid) => uid !== request.user.sub);
+          if (recipients.length === 0) return;
+          const presta = await fastify.db('user')
+            .where({ id: request.user.sub })
+            .select('first_name', 'last_name')
+            .first();
+          const name = presta ? `${presta.first_name} ${presta.last_name}`.trim() : 'Un prestataire';
+          const dateLabel = new Date(menage.date_prevue).toLocaleDateString('fr-FR', {
+            day: 'numeric',
+            month: 'long',
+          });
+          await sendPushToUsers(fastify.db, recipients, {
+            title: 'Demande de report',
+            body: `${name} demande à reporter le ménage du ${dateLabel}.`,
+            data: { menage_id: menage.id, type: 'reschedule_request' },
+          });
+        })().catch((err) => fastify.log.error({ err }, 'push reschedule create failed'));
+
         return reply.code(201).send(row);
       },
     );
@@ -137,6 +162,23 @@ export default fp(
           data.decision_reason,
           data.apply_to_menage,
         );
+
+        // Notification push au prestataire qui a fait la demande.
+        if (existing.requested_by !== request.user.sub) {
+          const approved = data.decision === 'approved';
+          const dateLabel = new Date(menage.date_prevue).toLocaleDateString('fr-FR', {
+            day: 'numeric',
+            month: 'long',
+          });
+          sendPushToUsers(fastify.db, [existing.requested_by], {
+            title: approved ? 'Demande de report acceptée' : 'Demande de report refusée',
+            body: approved
+              ? `Ta demande pour le ménage du ${dateLabel} a été acceptée.`
+              : `Ta demande pour le ménage du ${dateLabel} a été refusée.`,
+            data: { menage_id: existing.menage_id, type: 'reschedule_decision' },
+          }).catch((err) => fastify.log.error({ err }, 'push reschedule decide failed'));
+        }
+
         return updated;
       },
     );

@@ -747,6 +747,37 @@ Onglets (`tab`) : `comments`, `comments_steps`, `photos`, `documents`, `emergenc
 
 ---
 
+## Notifications push (device tokens)
+
+Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie les push via l'API Push d'Expo (`https://exp.host`). Les tokens invalides (`DeviceNotRegistered`) sont purgés automatiquement.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| POST | `/device-tokens` | Enregistre/rafraîchit le token de l'appareil courant — body `{ token, platform? }`. Authentifié. Upsert sur `token`. |
+| DELETE | `/device-tokens` | Désenregistre l'appareil (au logout) — body `{ token }`. Authentifié. → 204 |
+
+**Événements déclenchant une push** :
+- **Ménage assigné** → prestataire(s) nouvellement affecté(s) (`PUT/POST /menages/:id/prestataires`, `PATCH /menages/:id`).
+- **Demande de report** → admins de l'organisation (`POST /reschedule-requests`).
+- **Réponse au report** (acceptée/refusée) → prestataire demandeur (`POST /reschedule-requests/:id/decide`).
+- **Nouveau commentaire** → participants du ménage hors auteur (`POST /comments`).
+
+Chaque notification embarque `data: { menage_id, type }` pour router vers le ménage au tap.
+
+> **Avatars** : `avatar_url` est signé à la lecture (token TTL 5 min, comme `/files`) dans `/auth/me` et toutes les listes exposant un avatar. Les avatars externes (URL ne contenant pas `/files/`) sont laissés intacts.
+
+## Pages web (pont email → app)
+
+Pages HTML publiques (pas d'API key) servant de relais depuis les emails : elles tentent d'ouvrir l'app via le deep link `estia-clean-connect://…` et proposent une retombée.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/invite/:token` | Page d'acceptation d'invitation (deep link `estia-clean-connect://invite/:token`). |
+| GET | `/reset-password/:token` | Page de réinitialisation (deep link `estia-clean-connect://reset-password/:token`). |
+| GET | `/assets/logo-estia.png` | Logo de marque (servi en statique, utilisé dans les emails). |
+
+---
+
 ## WebSocket
 
 `GET /ws?token=<jwt>` — connexion temps réel.

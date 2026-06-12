@@ -1,6 +1,7 @@
 import { Knex } from 'knex';
 import BaseService, { PaginationOptions, PaginatedResult } from '@/lib/base-service';
 import { LogementMemberRow, LogementMemberRole } from './logement-member.schema';
+import { signUrlsInList } from '@/lib/sign-url';
 
 /** Default permissions per role */
 export const DEFAULT_PERMISSIONS: Record<
@@ -111,7 +112,7 @@ class LogementMemberService extends BaseService<LogementMemberRow> {
     ]);
 
     return {
-      data: items,
+      data: signUrlsInList(items, ['avatar_url']),
       meta: {
         total: parseInt(count, 10),
         page,

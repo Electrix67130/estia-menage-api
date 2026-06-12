@@ -1,5 +1,6 @@
 import { Knex } from 'knex';
 import { MenagePrestataireRow, MenagePrestataireWithUser } from './menage-prestataire.schema';
+import { signFields } from '@/lib/sign-url';
 
 class MenagePrestataireService {
   constructor(private db: Knex) {}
@@ -20,7 +21,7 @@ class MenagePrestataireService {
         'user.email',
         'user.avatar_url',
       )) as Omit<MenagePrestataireWithUser, 'is_primary'>[];
-    return rows.map((r, idx) => ({ ...r, is_primary: idx === 0 }));
+    return rows.map((r, idx) => ({ ...signFields(r, ['avatar_url']), is_primary: idx === 0 }));
   }
 
   /**

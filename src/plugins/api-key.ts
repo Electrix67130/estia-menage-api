@@ -3,7 +3,14 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import env from '@/config/env';
 
 const PUBLIC_ROUTES = ['/health'];
-const PUBLIC_PREFIXES = ['/files/', '/calendar/ical/', '/calendar/oauth/'];
+const PUBLIC_PREFIXES = [
+  '/files/',
+  '/calendar/ical/',
+  '/calendar/oauth/',
+  '/assets/',
+  '/invite/',
+  '/reset-password/',
+];
 
 async function apiKey(fastify: FastifyInstance) {
   fastify.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {

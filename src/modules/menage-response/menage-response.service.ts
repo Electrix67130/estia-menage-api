@@ -6,12 +6,13 @@ import {
   MyUpcomingMenage,
 } from './menage-response.schema';
 import { computeNeedsAttention, MenageStatus } from '@/modules/menage/menage.schema';
+import { signUrlsInList } from '@/lib/sign-url';
 
 class MenageResponseService {
   constructor(private db: Knex) {}
 
   async findByMenage(menageId: string): Promise<MenageResponseWithUser[]> {
-    return this.db('menage_response')
+    const rows = (await this.db('menage_response')
       .leftJoin('user', 'menage_response.user_id', 'user.id')
       .where('menage_response.menage_id', menageId)
       .select(
@@ -21,7 +22,8 @@ class MenageResponseService {
         'user.email',
         'user.avatar_url',
       )
-      .orderBy('menage_response.responded_at', 'desc') as Promise<MenageResponseWithUser[]>;
+      .orderBy('menage_response.responded_at', 'desc')) as MenageResponseWithUser[];
+    return signUrlsInList(rows, ['avatar_url']);
   }
 
   /**

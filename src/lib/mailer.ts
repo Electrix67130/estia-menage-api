@@ -34,6 +34,44 @@ export async function sendMail({ to, subject, html }: SendMailOptions): Promise<
   });
 }
 
+const BRAND = '#2563EB';
+
+/** Coquille HTML commune a tous les emails transactionnels (logo + branding Estia Clean Connect). */
+export function buildBrandedEmail(params: {
+  heading: string;
+  bodyHtml: string;
+  ctaLabel: string;
+  ctaUrl: string;
+  footnoteHtml?: string;
+}): string {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background: #F7FAFC;">
+      <div style="text-align: center; margin-bottom: 28px;">
+        <img src="${env.APP_URL}/assets/logo-estia.png" alt="Estia Clean Connect" height="72" style="height: 72px; width: auto;">
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 28px;">
+        <h2 style="color: #0F172A; margin-top: 0;">${params.heading}</h2>
+        ${params.bodyHtml}
+
+        <div style="text-align: center; margin: 28px 0 8px;">
+          <a href="${params.ctaUrl}"
+             style="display: inline-block; background: ${BRAND}; color: #FFFFFF; text-decoration: none;
+                    padding: 14px 32px; border-radius: 10px; font-weight: 600; font-size: 16px;">
+            ${params.ctaLabel}
+          </a>
+        </div>
+
+        ${params.footnoteHtml ? `<p style="color: #94A3B8; font-size: 13px; line-height: 1.6;">${params.footnoteHtml}</p>` : ''}
+      </div>
+
+      <p style="color: #94A3B8; font-size: 12px; text-align: center; margin-top: 24px;">
+        Estia Clean Connect — Gestion de prestations de menage
+      </p>
+    </div>
+  `;
+}
+
 export function buildInvitationEmail(params: {
   inviterName: string;
   email: string;
@@ -41,10 +79,8 @@ export function buildInvitationEmail(params: {
   token: string;
   expiresAt: string;
 }): { subject: string; html: string } {
-  // Deep link into the app (Expo scheme 'estia-menage-api://') + web fallback
-  const appLink = `estia-menage-api://invite/${params.token}`;
+  // Lien web public (page pont) qui ouvre l'app via deep link estia-clean-connect://
   const webLink = `${env.APP_URL}/invite/${params.token}`;
-  const inviteUrl = appLink;
   const expiresFormatted = new Date(params.expiresAt).toLocaleDateString('fr-FR', {
     day: 'numeric',
     month: 'long',
@@ -58,40 +94,20 @@ export function buildInvitationEmail(params: {
   };
 
   return {
-    subject: `${params.inviterName} vous invite à rejoindre Estia Menage`,
-    html: `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px;">
-        <div style="text-align: center; margin-bottom: 32px;">
-          <h1 style="color: #D97706; font-size: 28px; margin: 0;">Estia Menage</h1>
-          <p style="color: #78716C; margin-top: 4px;">Gestion de ménages — locations courte durée</p>
-        </div>
-
-        <div style="background: #FAFAF9; border: 1px solid #E7E5E4; border-radius: 12px; padding: 24px;">
-          <h2 style="color: #1C1917; margin-top: 0;">Vous êtes invité !</h2>
-          <p style="color: #57534E; line-height: 1.6;">
-            <strong>${params.inviterName}</strong> vous invite à rejoindre la plateforme Estia Menage
-            en tant que <strong>${roleLabels[params.role] || params.role}</strong>.
-          </p>
-
-          <div style="text-align: center; margin: 24px 0;">
-            <a href="${appLink}"
-               style="display: inline-block; background: #D97706; color: white; text-decoration: none;
-                      padding: 12px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
-              Accepter l'invitation
-            </a>
-          </div>
-
-          <p style="color: #A8A29E; font-size: 13px;">
-            Cette invitation expire le ${expiresFormatted}.<br>
-            Ouvrir dans l'app : <a href="${appLink}" style="color: #D97706;">${appLink}</a><br>
-            Ou version web : <a href="${webLink}" style="color: #D97706;">${webLink}</a>
-          </p>
-        </div>
-
-        <p style="color: #A8A29E; font-size: 12px; text-align: center; margin-top: 24px;">
-          Estia Menage — Gestion de prestations de ménage
-        </p>
-      </div>
-    `,
+    subject: `${params.inviterName} vous invite à rejoindre Estia Clean Connect`,
+    html: buildBrandedEmail({
+      heading: 'Vous êtes invité !',
+      bodyHtml: `
+        <p style="color: #475569; line-height: 1.6; margin: 0;">
+          <strong>${params.inviterName}</strong> vous invite à rejoindre <strong>Estia Clean Connect</strong>
+          en tant que <strong>${roleLabels[params.role] || params.role}</strong>.
+        </p>`,
+      ctaLabel: "Accepter l'invitation",
+      ctaUrl: webLink,
+      footnoteHtml: `
+        Cette invitation expire le ${expiresFormatted}.<br>
+        Ou copiez ce lien dans votre navigateur :<br>
+        <a href="${webLink}" style="color: ${BRAND};">${webLink}</a>`,
+    }),
   };
 }

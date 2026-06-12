@@ -63,16 +63,22 @@ export function emitToUser(userId: string, event: RealtimeEvent): void {
  * On exclut l'auteur de l'action lui-meme (event.actor_id) — il a deja l'info
  * via la mutation locale, pas la peine de le re-notifier.
  */
-export async function emitToMenage(
+/**
+ * Calcule la liste des users ayant acces a un menage (createur + admins de
+ * l'org + membres du logement parent), optionnellement en excluant un user
+ * (typiquement l'acteur de l'action). Partage entre le temps reel (WebSocket)
+ * et les notifications push.
+ */
+export async function getMenageRecipientIds(
   db: Knex,
   menageId: string,
-  event: RealtimeEvent,
-): Promise<void> {
+  exceptUserId?: string,
+): Promise<string[]> {
   const menage = await db('menage')
     .where({ id: menageId })
     .select('organization_id', 'created_by', 'logement_id')
     .first();
-  if (!menage) return;
+  if (!menage) return [];
 
   const userIds = new Set<string>();
 
@@ -92,8 +98,17 @@ export async function emitToMenage(
   for (const m of members) userIds.add(m.user_id);
 
   // On retire l'acteur — pas besoin de se notifier soi-meme.
-  if (event.actor_id) userIds.delete(event.actor_id);
+  if (exceptUserId) userIds.delete(exceptUserId);
 
+  return [...userIds];
+}
+
+export async function emitToMenage(
+  db: Knex,
+  menageId: string,
+  event: RealtimeEvent,
+): Promise<void> {
+  const userIds = await getMenageRecipientIds(db, menageId, event.actor_id);
   for (const userId of userIds) {
     emitToUser(userId, event);
   }
