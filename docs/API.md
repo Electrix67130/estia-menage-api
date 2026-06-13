@@ -757,7 +757,8 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 | DELETE | `/device-tokens` | Désenregistre l'appareil (au logout) — body `{ token }`. Authentifié. → 204 |
 
 **Événements déclenchant une push** :
-- **Ménage assigné** → prestataire(s) nouvellement affecté(s) (`PUT/POST /menages/:id/prestataires`, `PATCH /menages/:id`).
+- **Ménage assigné** → prestataire(s) nouvellement affecté(s) (`POST/PUT/POST /menages/:id/prestataires`, `PATCH /menages/:id`, création `POST /menages` avec `prestataire_user_id`).
+- **Nouveau ménage disponible** → prestataires membres du logement, quand un ménage est créé **sans** affectation (`POST /menages`) → ils se positionnent présent/absent.
 - **Demande de report** → admins de l'organisation (`POST /reschedule-requests`).
 - **Réponse au report** (acceptée/refusée) → prestataire demandeur (`POST /reschedule-requests/:id/decide`).
 - **Nouveau commentaire** → participants du ménage hors auteur (`POST /comments`).

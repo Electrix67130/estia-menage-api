@@ -86,6 +86,31 @@ export async function sendPushToUsers(
   }
 }
 
+/** Récupère un libellé date + logement pour le corps des notifications ménage. */
+async function menageLabel(
+  db: Knex,
+  menageId: string,
+): Promise<{ dateLabel: string; lieu: string; logementId: string } | null> {
+  const menage = (await db('menage')
+    .leftJoin('logement', 'menage.logement_id', 'logement.id')
+    .where('menage.id', menageId)
+    .select('menage.date_prevue', 'menage.logement_id', 'logement.name as logement_name')
+    .first()) as
+    | { date_prevue: string; logement_id: string; logement_name: string | null }
+    | undefined;
+  if (!menage) return null;
+  const dateLabel = new Date(menage.date_prevue).toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  return {
+    dateLabel,
+    lieu: menage.logement_name ? ` — ${menage.logement_name}` : '',
+    logementId: menage.logement_id,
+  };
+}
+
 /**
  * Notifie par push les prestataires nouvellement affectes a un menage.
  * Helper metier partage entre l'affectation multi (PUT /menages/:id/prestataires)
@@ -97,21 +122,34 @@ export async function notifyMenageAssignment(
   newUserIds: string[],
 ): Promise<void> {
   if (newUserIds.length === 0) return;
-  const menage = (await db('menage')
-    .leftJoin('logement', 'menage.logement_id', 'logement.id')
-    .where('menage.id', menageId)
-    .select('menage.date_prevue', 'logement.name as logement_name')
-    .first()) as { date_prevue: string; logement_name: string | null } | undefined;
-  if (!menage) return;
-  const dateLabel = new Date(menage.date_prevue).toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
-  const lieu = menage.logement_name ? ` — ${menage.logement_name}` : '';
+  const label = await menageLabel(db, menageId);
+  if (!label) return;
   await sendPushToUsers(db, newUserIds, {
     title: 'Nouveau ménage assigné',
-    body: `${dateLabel}${lieu}`,
+    body: `${label.dateLabel}${label.lieu}`,
     data: { menage_id: menageId, type: 'assignment' },
+  });
+}
+
+/**
+ * Notifie les prestataires membres du logement qu'un nouveau ménage est
+ * disponible (créé sans affectation) → ils peuvent se positionner présent/absent.
+ */
+export async function notifyMenageAvailable(
+  db: Knex,
+  menageId: string,
+  exceptUserId?: string,
+): Promise<void> {
+  const label = await menageLabel(db, menageId);
+  if (!label) return;
+  const members = (await db('logement_member')
+    .where({ logement_id: label.logementId, role: 'prestataire' })
+    .select('user_id')) as { user_id: string }[];
+  const recipients = members.map((m) => m.user_id).filter((id) => id !== exceptUserId);
+  if (recipients.length === 0) return;
+  await sendPushToUsers(db, recipients, {
+    title: 'Nouveau ménage disponible',
+    body: `${label.dateLabel}${label.lieu} · indique ta disponibilité`,
+    data: { menage_id: menageId, type: 'available' },
   });
 }

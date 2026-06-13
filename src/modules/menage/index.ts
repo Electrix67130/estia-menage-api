@@ -16,7 +16,7 @@ import {
   requirePermissionForLogement,
 } from '@/lib/permissions';
 import { emitToMenage } from '@/lib/realtime-hub';
-import { notifyMenageAssignment } from '@/lib/push';
+import { notifyMenageAssignment, notifyMenageAvailable } from '@/lib/push';
 import { signUrlsInList } from '@/lib/sign-url';
 
 const uuidSchema = z.object({ id: z.string().uuid() });
@@ -172,10 +172,18 @@ export default fp(
         logement,
       );
 
-      // Notif push si un prestataire est assigné dès la création (hors auteur).
-      if (data.prestataire_user_id && data.prestataire_user_id !== request.user.sub) {
-        notifyMenageAssignment(fastify.db, menage.id, [data.prestataire_user_id]).catch((err) =>
-          fastify.log.error({ err }, 'push assignment (create) failed'),
+      // Notif push à la création :
+      // - assigné directement → on prévient le prestataire concerné ;
+      // - sinon → on signale aux prestataires du logement qu'un ménage est dispo.
+      if (data.prestataire_user_id) {
+        if (data.prestataire_user_id !== request.user.sub) {
+          notifyMenageAssignment(fastify.db, menage.id, [data.prestataire_user_id]).catch((err) =>
+            fastify.log.error({ err }, 'push assignment (create) failed'),
+          );
+        }
+      } else {
+        notifyMenageAvailable(fastify.db, menage.id, request.user.sub).catch((err) =>
+          fastify.log.error({ err }, 'push available (create) failed'),
         );
       }
 
