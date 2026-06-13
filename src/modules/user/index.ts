@@ -4,6 +4,7 @@ import UserService from './user.service';
 import { updateUserSchema } from './user.schema';
 import { getUserOrganizationId } from '@/lib/org-scope';
 import { getActiveMembership } from '@/lib/active-membership';
+import { signFields } from '@/lib/sign-url';
 
 const searchSchema = z.object({
   q: z.string().min(1).max(100),
@@ -60,7 +61,7 @@ export default fp(
       const user = await service.findById(id);
       if (!user) return reply.notFound('User not found');
       const { password_hash: _, ...safeUser } = user;
-      return safeUser;
+      return signFields(safeUser, ['avatar_url']);
     });
 
     // PATCH /users/:id — self update OR admin for role/is_active

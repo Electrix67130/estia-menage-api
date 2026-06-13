@@ -1,6 +1,7 @@
 import { Knex } from 'knex';
 import BaseService, { PaginationOptions, PaginatedResult } from '@/lib/base-service';
 import { UserRow } from './user.schema';
+import { signUrlsInList } from '@/lib/sign-url';
 
 const USER_PUBLIC_COLS = [
   'user.id',
@@ -53,7 +54,7 @@ class UserService extends BaseService<UserRow> {
       .offset((page - 1) * limit);
 
     return {
-      data,
+      data: signUrlsInList(data, ['avatar_url']),
       meta: { total: parseInt(count, 10), page, limit, totalPages: Math.ceil(parseInt(count, 10) / limit) },
     };
   }
@@ -94,7 +95,7 @@ class UserService extends BaseService<UserRow> {
       .offset((page - 1) * limit);
 
     return {
-      data,
+      data: signUrlsInList(data, ['avatar_url']),
       meta: { total: parseInt(count, 10), page, limit, totalPages: Math.ceil(parseInt(count, 10) / limit) },
     };
   }
@@ -136,7 +137,7 @@ class UserService extends BaseService<UserRow> {
       .offset((page - 1) * limit);
 
     return {
-      data,
+      data: signUrlsInList(data, ['avatar_url']),
       meta: { total: parseInt(count, 10), page, limit, totalPages: Math.ceil(parseInt(count, 10) / limit) },
     };
   }
