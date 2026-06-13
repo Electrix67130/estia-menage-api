@@ -171,6 +171,14 @@ export default fp(
         },
         logement,
       );
+
+      // Notif push si un prestataire est assigné dès la création (hors auteur).
+      if (data.prestataire_user_id && data.prestataire_user_id !== request.user.sub) {
+        notifyMenageAssignment(fastify.db, menage.id, [data.prestataire_user_id]).catch((err) =>
+          fastify.log.error({ err }, 'push assignment (create) failed'),
+        );
+      }
+
       return reply.code(201).send(menage);
     });
 
