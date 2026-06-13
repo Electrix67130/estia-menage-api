@@ -3,7 +3,7 @@ import { z } from 'zod';
 import MenagePrestataireService from './menage-prestataire.service';
 import { setMenagePrestatairesSchema } from './menage-prestataire.schema';
 import { getActiveMembership } from '@/lib/active-membership';
-import { notifyMenageAssignment } from '@/lib/push';
+import { notifyMenageAssignment, notifyMenageUnassigned } from '@/lib/push';
 
 const menageIdParam = z.object({ id: z.string().uuid() });
 const menageUserIdParam = z.object({
@@ -113,6 +113,14 @@ export default fp(
           fastify.log.error({ err }, 'push assignment failed'),
         );
 
+        // Prestataires retirés par le remplacement → les prévenir.
+        const removed = [...beforeSet].filter(
+          (u) => !prestataire_user_ids.includes(u) && u !== request.user.sub,
+        );
+        notifyMenageUnassigned(fastify.db, id, removed).catch((err) =>
+          fastify.log.error({ err }, 'push unassigned failed'),
+        );
+
         return { data };
       },
     );
@@ -178,6 +186,14 @@ export default fp(
           });
         }
         await service.removePrestataire(id, user_id);
+
+        // Prévenir le prestataire retiré (hors auteur).
+        if (user_id !== request.user.sub) {
+          notifyMenageUnassigned(fastify.db, id, [user_id]).catch((err) =>
+            fastify.log.error({ err }, 'push unassigned failed'),
+          );
+        }
+
         return reply.code(204).send();
       },
     );

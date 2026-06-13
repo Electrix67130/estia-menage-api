@@ -757,10 +757,13 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 | DELETE | `/device-tokens` | Désenregistre l'appareil (au logout) — body `{ token }`. Authentifié. → 204 |
 
 **Événements déclenchant une push** :
-- **Ménage assigné** → prestataire(s) nouvellement affecté(s) (`POST/PUT/POST /menages/:id/prestataires`, `PATCH /menages/:id`, création `POST /menages` avec `prestataire_user_id`).
-- **Nouveau ménage disponible** → prestataires membres du logement, quand un ménage est créé **sans** affectation (`POST /menages`) → ils se positionnent présent/absent.
-- **Demande de report** → admins de l'organisation (`POST /reschedule-requests`).
-- **Réponse au report** (acceptée/refusée) → prestataire demandeur (`POST /reschedule-requests/:id/decide`).
+- **Ménage assigné** → prestataire(s) nouvellement affecté(s) (`POST/PUT /menages/:id/prestataires`, `PATCH /menages/:id`, création `POST /menages` avec `prestataire_user_id`).
+- **Nouveau ménage disponible** → prestataires membres du logement, quand un ménage est créé **sans** affectation (`POST /menages` **et** auto-création par sync iCal) → ils se positionnent présent/absent.
+- **Ménage modifié** (date/horaire) → prestataires assignés (`PATCH /menages/:id`).
+- **Ménage annulé** → prestataires assignés (`PATCH status=annule`, `DELETE /menages/:id`, **annulation par sync iCal**).
+- **Ménage retiré** (désassignation) → prestataire retiré (`DELETE /menages/:id/prestataires/:user_id`, `PUT` full-replace, `PATCH` legacy).
+- **Demande de report** → admins de l'org (`POST /reschedule-requests`).
+- **Report accepté/refusé** → prestataire demandeur (`POST /reschedule-requests/:id/decide`).
 - **Nouveau commentaire** → participants du ménage hors auteur (`POST /comments`).
 
 Chaque notification embarque `data: { menage_id, type }` pour router vers le ménage au tap.

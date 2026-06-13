@@ -16,7 +16,13 @@ import {
   requirePermissionForLogement,
 } from '@/lib/permissions';
 import { emitToMenage } from '@/lib/realtime-hub';
-import { notifyMenageAssignment, notifyMenageAvailable } from '@/lib/push';
+import {
+  notifyMenageAssignment,
+  notifyMenageAvailable,
+  notifyMenageUpdated,
+  notifyMenageCancelled,
+  notifyMenageUnassigned,
+} from '@/lib/push';
 import { signUrlsInList } from '@/lib/sign-url';
 
 const uuidSchema = z.object({ id: z.string().uuid() });
@@ -264,6 +270,41 @@ export default fp(
             fastify.log.error({ err }, 'push assignment (patch) failed'),
           );
         }
+        // Ancien prestataire retiré (désassignation) → le prévenir.
+        if (
+          existing.prestataire_user_id &&
+          existing.prestataire_user_id !== data.prestataire_user_id &&
+          existing.prestataire_user_id !== request.user.sub
+        ) {
+          notifyMenageUnassigned(fastify.db, id, [existing.prestataire_user_id]).catch((err) =>
+            fastify.log.error({ err }, 'push unassigned (patch) failed'),
+          );
+        }
+      }
+
+      // Notifs aux prestataires assignés (hors auteur) sur modif de date/horaire
+      // ou annulation du ménage.
+      const dateTimeChanged =
+        ('date_prevue' in data && data.date_prevue !== existing.date_prevue) ||
+        ('horaire_prevu' in data && data.horaire_prevu !== existing.horaire_prevu);
+      const justCancelled =
+        'status' in data && data.status === 'annule' && existing.status !== 'annule';
+      if (dateTimeChanged || justCancelled) {
+        const assigned = (await fastify.db('menage_prestataire')
+          .where({ menage_id: id })
+          .select('user_id')) as { user_id: string }[];
+        const recipients = assigned
+          .map((a) => a.user_id)
+          .filter((uid) => uid !== request.user.sub);
+        if (justCancelled) {
+          notifyMenageCancelled(fastify.db, id, recipients).catch((err) =>
+            fastify.log.error({ err }, 'push cancelled (patch) failed'),
+          );
+        } else if (dateTimeChanged) {
+          notifyMenageUpdated(fastify.db, id, recipients).catch((err) =>
+            fastify.log.error({ err }, 'push updated (patch) failed'),
+          );
+        }
       }
 
       return menage;
@@ -282,6 +323,16 @@ export default fp(
           message: 'Admin only',
         });
       }
+      // Prévenir les prestataires assignés avant la suppression (la ligne doit
+      // encore exister pour résoudre le libellé) — on attend l'envoi.
+      const assigned = (await fastify.db('menage_prestataire')
+        .where({ menage_id: id })
+        .select('user_id')) as { user_id: string }[];
+      const recipients = assigned.map((a) => a.user_id).filter((uid) => uid !== request.user.sub);
+      await notifyMenageCancelled(fastify.db, id, recipients).catch((err) =>
+        fastify.log.error({ err }, 'push cancelled (delete) failed'),
+      );
+
       await service.delete(id);
       return reply.code(204).send();
     });

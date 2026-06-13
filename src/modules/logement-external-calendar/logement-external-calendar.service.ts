@@ -8,6 +8,7 @@ import {
 import { parseIcal, isBlockedEvent, IcalEvent } from './ical-parser';
 import { generateChecklistForMenage } from '@/modules/menage-check/menage-check.service';
 import { LogementRow } from '@/modules/logement/logement.schema';
+import { notifyMenageAvailable, notifyMenageCancelled } from '@/lib/push';
 
 class LogementExternalCalendarService {
   constructor(private db: Knex) {}
@@ -122,6 +123,8 @@ class LogementExternalCalendarService {
     }>;
     const existingByUid = new Map(existing.map((m) => [m.external_event_uid, m]));
     const seenUids = new Set<string>();
+    const createdMenageIds: string[] = [];
+    const cancelledMenageIds: string[] = [];
 
     const defaultDuration = logement.default_duration_min ?? null;
     const defaultClientPrice = numOrNull(logement.default_client_price_ht);
@@ -189,6 +192,7 @@ class LogementExternalCalendarService {
           id: string;
         }>;
         await generateChecklistForMenage(trx, menage.id, logement);
+        createdMenageIds.push(menage.id);
       });
       result.created_menages++;
     }
@@ -200,10 +204,28 @@ class LogementExternalCalendarService {
       await this.db('menage')
         .where({ id: prev.id })
         .update({ status: 'annule', updated_at: new Date() });
+      cancelledMenageIds.push(prev.id);
       result.cancelled_menages++;
     }
 
     await this.markSync(cal.id, null);
+
+    // Notifications push (fire-and-forget) — après la sync, hors transaction.
+    // Création iCal = ménage non assigné → "disponible" aux prestataires du logement.
+    for (const menageId of createdMenageIds) {
+      notifyMenageAvailable(this.db, menageId).catch(() => {});
+    }
+    // Annulation iCal → prévenir les prestataires assignés (s'il y en a).
+    for (const menageId of cancelledMenageIds) {
+      this.db('menage_prestataire')
+        .where({ menage_id: menageId })
+        .select('user_id')
+        .then((rows: { user_id: string }[]) =>
+          notifyMenageCancelled(this.db, menageId, rows.map((r) => r.user_id)),
+        )
+        .catch(() => {});
+    }
+
     return result;
   }
 

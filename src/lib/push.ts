@@ -131,6 +131,54 @@ export async function notifyMenageAssignment(
   });
 }
 
+/** Ménage modifié (date/horaire) → prestataires assignés. */
+export async function notifyMenageUpdated(
+  db: Knex,
+  menageId: string,
+  userIds: string[],
+): Promise<void> {
+  if (userIds.length === 0) return;
+  const label = await menageLabel(db, menageId);
+  if (!label) return;
+  await sendPushToUsers(db, userIds, {
+    title: 'Ménage modifié',
+    body: `${label.dateLabel}${label.lieu} · la date ou l'horaire a changé`,
+    data: { menage_id: menageId, type: 'updated' },
+  });
+}
+
+/** Ménage annulé → prestataires assignés. */
+export async function notifyMenageCancelled(
+  db: Knex,
+  menageId: string,
+  userIds: string[],
+): Promise<void> {
+  if (userIds.length === 0) return;
+  const label = await menageLabel(db, menageId);
+  if (!label) return;
+  await sendPushToUsers(db, userIds, {
+    title: 'Ménage annulé',
+    body: `Le ménage du ${label.dateLabel}${label.lieu} a été annulé.`,
+    data: { menage_id: menageId, type: 'cancelled' },
+  });
+}
+
+/** Prestataire retiré d'un ménage → le prévenir. */
+export async function notifyMenageUnassigned(
+  db: Knex,
+  menageId: string,
+  userIds: string[],
+): Promise<void> {
+  if (userIds.length === 0) return;
+  const label = await menageLabel(db, menageId);
+  if (!label) return;
+  await sendPushToUsers(db, userIds, {
+    title: 'Ménage retiré',
+    body: `Tu n'es plus assigné au ménage du ${label.dateLabel}${label.lieu}.`,
+    data: { menage_id: menageId, type: 'unassigned' },
+  });
+}
+
 /**
  * Notifie les prestataires membres du logement qu'un nouveau ménage est
  * disponible (créé sans affectation) → ils peuvent se positionner présent/absent.
