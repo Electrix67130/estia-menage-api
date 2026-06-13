@@ -6,6 +6,7 @@ import LogementRoomService from '@/modules/logement-room/logement-room.service';
 import { computeConsommableAlerts } from '@/modules/logement-consommable/logement-consommable.service';
 import { getActiveMembership } from '@/lib/active-membership';
 import { geocodeAddress } from '@/lib/geocode';
+import { signFields } from '@/lib/sign-url';
 
 /**
  * Si l'utilisateur n'a pas fourni de coordonnées explicites mais a fourni
@@ -68,7 +69,7 @@ export default fp(
       return {
         ...result,
         data: result.data.map((l) => ({
-          ...l,
+          ...signFields(l, ['cover_photo_url']),
           consommables_alert: alerts.get(l.id) ?? 0,
         })),
       };
@@ -90,7 +91,7 @@ export default fp(
         if (!isMember) return reply.notFound('Logement not found');
       }
       const alerts = await computeConsommableAlerts(fastify.db, [id]);
-      return { ...logement, consommables_alert: alerts.get(id) ?? 0 };
+      return { ...signFields(logement, ['cover_photo_url']), consommables_alert: alerts.get(id) ?? 0 };
     });
 
     // POST /logements — admin only

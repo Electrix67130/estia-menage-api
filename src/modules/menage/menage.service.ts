@@ -39,7 +39,9 @@ class MenageService extends BaseService<MenageRow> {
           "EXISTS (SELECT 1 FROM menage_reschedule_request mrr WHERE mrr.menage_id = menage.id AND mrr.status = 'pending') as has_pending_reschedule",
         ),
       )) as MenageRow | undefined;
-    return row ? signFields(row, ['prestataire_avatar_url']) : row;
+    return row
+      ? signFields(row, ['prestataire_avatar_url', 'arrival_photo_url', 'departure_photo_url'])
+      : row;
   }
 
   async findActive(
@@ -119,7 +121,11 @@ class MenageService extends BaseService<MenageRow> {
     const count = countResult[0].count;
 
     return {
-      data: signUrlsInList(data, ['prestataire_avatar_url']),
+      data: signUrlsInList(data, [
+        'prestataire_avatar_url',
+        'arrival_photo_url',
+        'departure_photo_url',
+      ]),
       meta: {
         total: parseInt(count, 10),
         page,

@@ -779,7 +779,7 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 
 Chaque notification embarque `data: { menage_id, type }` pour router vers le ménage au tap.
 
-> **Avatars** : `avatar_url` est signé à la lecture (token TTL 5 min, comme `/files`) dans `/auth/me` et toutes les listes exposant un avatar. Les avatars externes (URL ne contenant pas `/files/`) sont laissés intacts.
+> **URLs de fichiers signées à la lecture** (token TTL 5 min, comme `/files`) : `avatar_url` (`/auth/me` + listes), `cover_photo_url` du logement (liste + détail), `arrival_photo_url`/`departure_photo_url` du ménage (détail, liste, réponses pointage), et `url`/`thumbnail_url` des photos (`/photos`). Les URLs externes (ne contenant pas `/files/`) sont laissées intactes.
 
 ## Pages web (pont email → app)
 

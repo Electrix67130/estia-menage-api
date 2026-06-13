@@ -26,7 +26,7 @@ import {
   notifyMenageDeparture,
   notifyMenageValidated,
 } from '@/lib/push';
-import { signUrlsInList } from '@/lib/sign-url';
+import { signUrlsInList, signFields } from '@/lib/sign-url';
 
 const uuidSchema = z.object({ id: z.string().uuid() });
 
@@ -365,7 +365,7 @@ export default fp(
         notifyMenageArrival(fastify.db, id, request.user.sub).catch((err) =>
           fastify.log.error({ err }, 'push arrival failed'),
         );
-        return updated;
+        return signFields(updated as Record<string, unknown>, ['arrival_photo_url', 'departure_photo_url']);
       },
     );
 
@@ -394,7 +394,7 @@ export default fp(
         notifyMenageDeparture(fastify.db, id, request.user.sub).catch((err) =>
           fastify.log.error({ err }, 'push departure failed'),
         );
-        return updated;
+        return signFields(updated as Record<string, unknown>, ['arrival_photo_url', 'departure_photo_url']);
       },
     );
 
