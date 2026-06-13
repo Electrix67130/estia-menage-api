@@ -770,6 +770,10 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 - **Ménage validé** → prestataires assignés (`POST /menages/:id/validate`).
 - **Nouveau commentaire** → participants du ménage hors auteur (`POST /comments`).
 
+**Rappels programmés** (worker `reminder-worker`, tick 15 min, fuseau Europe/Paris ; anti-doublon via `menage.reminder_eve_sent_at` / `reminder_2h_sent_at`) :
+- **Veille 18h** → prestataires assignés (« Demain · … ») ; si le ménage est **non assigné**, **relance** les prestataires du logement **non encore positionnés** (présent/absent).
+- **2h avant** l'`horaire_prevu` → prestataires assignés.
+
 Chaque notification embarque `data: { menage_id, type }` pour router vers le ménage au tap.
 
 > **Avatars** : `avatar_url` est signé à la lecture (token TTL 5 min, comme `/files`) dans `/auth/me` et toutes les listes exposant un avatar. Les avatars externes (URL ne contenant pas `/files/`) sont laissés intacts.

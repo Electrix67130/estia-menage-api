@@ -322,3 +322,47 @@ export async function notifyRescheduleCancelled(
     data: { menage_id: menageId, type: 'reschedule_cancelled' },
   });
 }
+
+/** Rappel programmé (veille 18h ou 2h avant) → prestataires assignés. */
+export async function notifyMenageReminder(
+  db: Knex,
+  menageId: string,
+  userIds: string[],
+  when: 'eve' | '2h',
+): Promise<void> {
+  if (userIds.length === 0) return;
+  const label = await menageLabel(db, menageId);
+  if (!label) return;
+  const body =
+    when === 'eve'
+      ? `Demain · ${label.dateLabel}${label.lieu}`
+      : `Bientôt (dans ~2h) · ${label.dateLabel}${label.lieu}`;
+  await sendPushToUsers(db, userIds, {
+    title: 'Rappel ménage',
+    body,
+    data: { menage_id: menageId, type: when === 'eve' ? 'reminder_eve' : 'reminder_2h' },
+  });
+}
+
+/**
+ * Relance (la veille) les prestataires membres du logement qui ne se sont PAS
+ * encore positionnés (aucune réponse présent/absent) sur un ménage non assigné.
+ */
+export async function notifyMenageRelance(db: Knex, menageId: string): Promise<void> {
+  const label = await menageLabel(db, menageId);
+  if (!label) return;
+  const members = (await db('logement_member')
+    .where({ logement_id: label.logementId, role: 'prestataire' })
+    .select('user_id')) as { user_id: string }[];
+  const responded = (await db('menage_response')
+    .where({ menage_id: menageId })
+    .select('user_id')) as { user_id: string }[];
+  const respondedSet = new Set(responded.map((r) => r.user_id));
+  const recipients = members.map((m) => m.user_id).filter((id) => !respondedSet.has(id));
+  if (recipients.length === 0) return;
+  await sendPushToUsers(db, recipients, {
+    title: 'Ménage à pourvoir demain',
+    body: `${label.dateLabel}${label.lieu} · indique ta disponibilité`,
+    data: { menage_id: menageId, type: 'relance' },
+  });
+}

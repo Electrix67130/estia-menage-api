@@ -479,6 +479,10 @@ Backfill : pour les rows existantes non-prestataire, les 3 flags sont mis à `tr
 - `laundry_client_price_ht` decimal(10,2)
 - `laundry_provider_price` decimal(10,2)
 
+### `menage` (ajouts rappels push)
+- `reminder_eve_sent_at` timestamp — rappel « veille 18h » envoyé (ou relance si non assigné). Anti-doublon worker.
+- `reminder_2h_sent_at` timestamp — rappel « 2h avant l'horaire » envoyé. Géré par `reminder-worker` (tick 15 min, Europe/Paris).
+
 ### `photo` (ajouts pour photos logement)
 - `menage_id` devient nullable
 - `logement_id` uuid FK logement CASCADE — lien direct au logement (sans ménage)
