@@ -3,6 +3,7 @@ import { z } from 'zod';
 import MenageResponseService from './menage-response.service';
 import { upsertMenageResponseSchema, listMyMenagesSchema } from './menage-response.schema';
 import { getActiveMembership } from '@/lib/active-membership';
+import { notifyMenageResponse } from '@/lib/push';
 
 const menageIdParam = z.object({ id: z.string().uuid() });
 
@@ -110,6 +111,10 @@ export default fp(
         }
 
         const response = await service.upsert(id, request.user.sub, status);
+        // Signaler aux admins que le prestataire s'est positionné (présent/absent).
+        notifyMenageResponse(fastify.db, id, request.user.sub, status).catch((err) =>
+          fastify.log.error({ err }, 'push response failed'),
+        );
         return response;
       },
     );

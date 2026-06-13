@@ -7,7 +7,7 @@ import {
   listRescheduleRequestsSchema,
 } from './menage-reschedule-request.schema';
 import { getActiveMembership } from '@/lib/active-membership';
-import { sendPushToUsers } from '@/lib/push';
+import { sendPushToUsers, notifyRescheduleCancelled } from '@/lib/push';
 
 const uuidSchema = z.object({ id: z.string().uuid() });
 
@@ -202,6 +202,10 @@ export default fp(
             message: 'La demande n\'est plus en attente',
           });
         }
+        // Prévenir les admins que la demande de report a été annulée.
+        notifyRescheduleCancelled(fastify.db, existing.menage_id, request.user.sub).catch((err) =>
+          fastify.log.error({ err }, 'push reschedule cancel failed'),
+        );
         return updated;
       },
     );

@@ -22,6 +22,9 @@ import {
   notifyMenageUpdated,
   notifyMenageCancelled,
   notifyMenageUnassigned,
+  notifyMenageArrival,
+  notifyMenageDeparture,
+  notifyMenageValidated,
 } from '@/lib/push';
 import { signUrlsInList } from '@/lib/sign-url';
 
@@ -359,6 +362,9 @@ export default fp(
           menage_id: id,
           actor_id: request.user.sub,
         }).catch((err) => fastify.log.error({ err }, 'WS emit failed'));
+        notifyMenageArrival(fastify.db, id, request.user.sub).catch((err) =>
+          fastify.log.error({ err }, 'push arrival failed'),
+        );
         return updated;
       },
     );
@@ -385,6 +391,9 @@ export default fp(
           menage_id: id,
           actor_id: request.user.sub,
         }).catch((err) => fastify.log.error({ err }, 'WS emit failed'));
+        notifyMenageDeparture(fastify.db, id, request.user.sub).catch((err) =>
+          fastify.log.error({ err }, 'push departure failed'),
+        );
         return updated;
       },
     );
@@ -405,6 +414,18 @@ export default fp(
           menage_id: id,
           actor_id: request.user.sub,
         }).catch((err) => fastify.log.error({ err }, 'WS emit failed'));
+        // Prévenir les prestataires assignés que leur rapport est validé.
+        fastify.db('menage_prestataire')
+          .where({ menage_id: id })
+          .select('user_id')
+          .then((rows: { user_id: string }[]) =>
+            notifyMenageValidated(
+              fastify.db,
+              id,
+              rows.map((r) => r.user_id).filter((u) => u !== request.user.sub),
+            ),
+          )
+          .catch((err) => fastify.log.error({ err }, 'push validated failed'));
         return updated;
       },
     );

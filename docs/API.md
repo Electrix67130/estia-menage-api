@@ -764,6 +764,10 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 - **Ménage retiré** (désassignation) → prestataire retiré (`DELETE /menages/:id/prestataires/:user_id`, `PUT` full-replace, `PATCH` legacy).
 - **Demande de report** → admins de l'org (`POST /reschedule-requests`).
 - **Report accepté/refusé** → prestataire demandeur (`POST /reschedule-requests/:id/decide`).
+- **Report annulé** → admins de l'org (`POST /reschedule-requests/:id/cancel`).
+- **Réponse présent/absent** → admins de l'org (`POST /menages/:id/responses`, auto-réponse du presta).
+- **Prestataire arrivé / ménage terminé** → admins de l'org (`POST /menages/:id/arrival` · `/departure`).
+- **Ménage validé** → prestataires assignés (`POST /menages/:id/validate`).
 - **Nouveau commentaire** → participants du ménage hors auteur (`POST /comments`).
 
 Chaque notification embarque `data: { menage_id, type }` pour router vers le ménage au tap.

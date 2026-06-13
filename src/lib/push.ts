@@ -201,3 +201,124 @@ export async function notifyMenageAvailable(
     data: { menage_id: menageId, type: 'available' },
   });
 }
+
+/** Nom affichable d'un user (prénom nom), fallback générique. */
+async function userName(db: Knex, userId: string): Promise<string> {
+  const u = (await db('user')
+    .where({ id: userId })
+    .select('first_name', 'last_name')
+    .first()) as { first_name?: string; last_name?: string } | undefined;
+  const name = `${u?.first_name ?? ''} ${u?.last_name ?? ''}`.trim();
+  return name || 'Un prestataire';
+}
+
+/** Admins de l'org d'un ménage (hors un user optionnel). */
+async function orgAdminsForMenage(
+  db: Knex,
+  menageId: string,
+  exceptUserId?: string,
+): Promise<string[]> {
+  const menage = (await db('menage')
+    .where({ id: menageId })
+    .select('organization_id')
+    .first()) as { organization_id: string } | undefined;
+  if (!menage) return [];
+  const admins = (await db('organization_member')
+    .where({ organization_id: menage.organization_id, role: 'admin' })
+    .select('user_id')) as { user_id: string }[];
+  return admins.map((a) => a.user_id).filter((id) => id !== exceptUserId);
+}
+
+/** Réponse présent/absent d'un prestataire → admins. */
+export async function notifyMenageResponse(
+  db: Knex,
+  menageId: string,
+  responderId: string,
+  status: 'present' | 'absent',
+): Promise<void> {
+  const [label, recipients, name] = await Promise.all([
+    menageLabel(db, menageId),
+    orgAdminsForMenage(db, menageId, responderId),
+    userName(db, responderId),
+  ]);
+  if (!label || recipients.length === 0) return;
+  const dispo = status === 'present' ? 'disponible' : 'indisponible';
+  await sendPushToUsers(db, recipients, {
+    title: 'Réponse prestataire',
+    body: `${name} est ${dispo} — ménage du ${label.dateLabel}${label.lieu}`,
+    data: { menage_id: menageId, type: 'response' },
+  });
+}
+
+/** Pointage d'arrivée du prestataire → admins. */
+export async function notifyMenageArrival(
+  db: Knex,
+  menageId: string,
+  prestaId: string,
+): Promise<void> {
+  const [label, recipients, name] = await Promise.all([
+    menageLabel(db, menageId),
+    orgAdminsForMenage(db, menageId, prestaId),
+    userName(db, prestaId),
+  ]);
+  if (!label || recipients.length === 0) return;
+  await sendPushToUsers(db, recipients, {
+    title: 'Prestataire arrivé',
+    body: `${name} est arrivé sur le ménage du ${label.dateLabel}${label.lieu}`,
+    data: { menage_id: menageId, type: 'arrival' },
+  });
+}
+
+/** Pointage de départ (ménage terminé) → admins. */
+export async function notifyMenageDeparture(
+  db: Knex,
+  menageId: string,
+  prestaId: string,
+): Promise<void> {
+  const [label, recipients, name] = await Promise.all([
+    menageLabel(db, menageId),
+    orgAdminsForMenage(db, menageId, prestaId),
+    userName(db, prestaId),
+  ]);
+  if (!label || recipients.length === 0) return;
+  await sendPushToUsers(db, recipients, {
+    title: 'Ménage terminé',
+    body: `${name} a terminé le ménage du ${label.dateLabel}${label.lieu}`,
+    data: { menage_id: menageId, type: 'departure' },
+  });
+}
+
+/** Rapport validé → prestataires assignés. */
+export async function notifyMenageValidated(
+  db: Knex,
+  menageId: string,
+  userIds: string[],
+): Promise<void> {
+  if (userIds.length === 0) return;
+  const label = await menageLabel(db, menageId);
+  if (!label) return;
+  await sendPushToUsers(db, userIds, {
+    title: 'Ménage validé',
+    body: `Ton ménage du ${label.dateLabel}${label.lieu} a été validé.`,
+    data: { menage_id: menageId, type: 'validated' },
+  });
+}
+
+/** Demande de report annulée par le prestataire → admins. */
+export async function notifyRescheduleCancelled(
+  db: Knex,
+  menageId: string,
+  requesterId: string,
+): Promise<void> {
+  const [label, recipients, name] = await Promise.all([
+    menageLabel(db, menageId),
+    orgAdminsForMenage(db, menageId, requesterId),
+    userName(db, requesterId),
+  ]);
+  if (!label || recipients.length === 0) return;
+  await sendPushToUsers(db, recipients, {
+    title: 'Demande de report annulée',
+    body: `${name} a annulé sa demande de report — ménage du ${label.dateLabel}${label.lieu}`,
+    data: { menage_id: menageId, type: 'reschedule_cancelled' },
+  });
+}
