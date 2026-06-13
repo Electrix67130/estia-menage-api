@@ -23,6 +23,7 @@ class AuthService {
     let finalRole = data.role;
     let finalCompanyName = data.company_name;
     let invitationId: string | null = null;
+    let invitedBy: string | null = null;
     let organizationId: string | null = null;
 
     // If registering via invitation: use invitation's email, role and organization_id
@@ -39,6 +40,7 @@ class AuthService {
       finalEmail = invitation.email;
       finalRole = invitation.role;
       invitationId = invitation.id;
+      invitedBy = invitation.invited_by;
       organizationId = invitation.organization_id;
 
       // Un invité (admin ou prestataire) rejoint l'org de l'inviteur → company = org name.
@@ -99,6 +101,16 @@ class AuthService {
     // Mark invitation as accepted if applicable
     if (invitationId) {
       await this.fastify.db('invitation').where({ id: invitationId }).update({ status: 'accepted' });
+      // Prévenir l'inviteur que la personne a rejoint l'organisation.
+      if (invitedBy) {
+        const { notifyInvitationAccepted } = await import('@/lib/push');
+        notifyInvitationAccepted(
+          this.fastify.db,
+          invitedBy,
+          `${data.first_name} ${data.last_name}`.trim(),
+          finalCompanyName || "l'organisation",
+        ).catch((err) => this.fastify.log.error({ err }, 'push invitation accepted failed'));
+      }
     }
 
     const tokens = await this.generateTokens(user, data.platform ?? 'web');

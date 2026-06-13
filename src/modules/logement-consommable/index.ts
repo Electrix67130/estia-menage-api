@@ -8,6 +8,7 @@ import {
   setReleveSchema,
 } from './logement-consommable.schema';
 import { getActiveMembership } from '@/lib/active-membership';
+import { notifyConsumablesLow } from '@/lib/push';
 
 const byLogementSchema = z.object({ logement_id: z.string().uuid() });
 const uuidSchema = z.object({ id: z.string().uuid() });
@@ -116,6 +117,13 @@ export default fp(
         });
       }
       const data = await service.setReleve(id, menage.logement_id, request.user.sub, items);
+
+      // Alerte admins sur les consommables passés sous le seuil à ce relevé.
+      const lowLabels = data.filter((d) => d.needs_restock).map((d) => d.label);
+      notifyConsumablesLow(fastify.db, id, lowLabels, request.user.sub).catch((err) =>
+        fastify.log.error({ err }, 'push consumables low failed'),
+      );
+
       return { data };
     });
 

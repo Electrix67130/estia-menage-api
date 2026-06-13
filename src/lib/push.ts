@@ -323,6 +323,41 @@ export async function notifyRescheduleCancelled(
   });
 }
 
+/** Consommables passés sous le seuil au relevé de fin → admins. */
+export async function notifyConsumablesLow(
+  db: Knex,
+  menageId: string,
+  labels: string[],
+  exceptUserId?: string,
+): Promise<void> {
+  if (labels.length === 0) return;
+  const [label, recipients] = await Promise.all([
+    menageLabel(db, menageId),
+    orgAdminsForMenage(db, menageId, exceptUserId),
+  ]);
+  if (!label || recipients.length === 0) return;
+  const lieu = label.lieu ? label.lieu.replace(/^ — /, '') : 'Logement';
+  await sendPushToUsers(db, recipients, {
+    title: 'Consommables à racheter',
+    body: `${lieu} · ${labels.join(', ')}`,
+    data: { menage_id: menageId, type: 'consumables_low' },
+  });
+}
+
+/** Invitation acceptée → l'inviteur. */
+export async function notifyInvitationAccepted(
+  db: Knex,
+  inviterId: string,
+  newUserName: string,
+  orgName: string,
+): Promise<void> {
+  await sendPushToUsers(db, [inviterId], {
+    title: 'Invitation acceptée',
+    body: `${newUserName} a rejoint ${orgName}.`,
+    data: { type: 'invitation_accepted' },
+  });
+}
+
 /** Rappel programmé (veille 18h ou 2h avant) → prestataires assignés. */
 export async function notifyMenageReminder(
   db: Knex,

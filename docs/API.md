@@ -770,6 +770,9 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 - **Ménage validé** → prestataires assignés (`POST /menages/:id/validate`).
 - **Nouveau commentaire** → participants du ménage hors auteur (`POST /comments`).
 
+- **Consommables à racheter** → admins de l'org, quand un relevé de fin passe des consommables sous le seuil (`PUT /menages/:id/consommables`).
+- **Invitation acceptée** → l'inviteur, quand l'invité finalise son inscription (`POST /auth/register` avec `invitation_token`).
+
 **Rappels programmés** (worker `reminder-worker`, tick 15 min, fuseau Europe/Paris ; anti-doublon via `menage.reminder_eve_sent_at` / `reminder_2h_sent_at`) :
 - **Veille 18h** → prestataires assignés (« Demain · … ») ; si le ménage est **non assigné**, **relance** les prestataires du logement **non encore positionnés** (présent/absent).
 - **2h avant** l'`horaire_prevu` → prestataires assignés.
