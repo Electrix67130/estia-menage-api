@@ -58,7 +58,7 @@ export default fp(
     // POST /reschedule-requests — prestataire assigné uniquement
     fastify.post(
       '/reschedule-requests',
-      { preHandler: [fastify.authenticate] },
+      { preHandler: [fastify.authenticate], config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
       async (request, reply) => {
         const data = createRescheduleRequestSchema.parse(request.body);
         const menage = await fastify.db('menage').where({ id: data.menage_id }).first();

@@ -49,7 +49,7 @@ export default fp(
     // Admin peut passer un `user_id` dans le body pour flipper le vote d'un presta.
     fastify.post(
       '/menages/:id/responses',
-      { preHandler: [fastify.authenticate] },
+      { preHandler: [fastify.authenticate], config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
       async (request, reply) => {
         const { id } = menageIdParam.parse(request.params);
         const { status, user_id: bodyUserId } = upsertMenageResponseSchema.parse(request.body);

@@ -69,6 +69,27 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 /**
+ * Anti-spam : plafonne le nombre de push reçues par un même destinataire sur
+ * une fenêtre glissante (protège la victime d'un abus type "1000 commentaires").
+ * En mémoire process — suffisant pour un déploiement mono-conteneur.
+ */
+const RECIPIENT_WINDOW_MS = 60_000;
+const RECIPIENT_MAX = 8;
+const recentByUser = new Map<string, number[]>();
+
+function allowRecipient(userId: string): boolean {
+  const now = Date.now();
+  const recent = (recentByUser.get(userId) ?? []).filter((t) => now - t < RECIPIENT_WINDOW_MS);
+  if (recent.length >= RECIPIENT_MAX) {
+    recentByUser.set(userId, recent);
+    return false;
+  }
+  recent.push(now);
+  recentByUser.set(userId, recent);
+  return true;
+}
+
+/**
  * Envoie une notification push a tous les appareils des users donnes.
  * Fire-and-forget cote appelant : les erreurs reseau sont avalees (log) pour
  * ne jamais casser la requete metier.
@@ -96,6 +117,9 @@ export async function sendPushToUsers(
     );
     recipientIds = uniqueUserIds.filter((id) => !disabled.has(id));
   }
+
+  // Throttle anti-spam par destinataire (fenêtre glissante).
+  recipientIds = recipientIds.filter((id) => allowRecipient(id));
   if (recipientIds.length === 0) return;
 
   const rows = (await db('device_token')

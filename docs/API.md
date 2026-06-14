@@ -779,6 +779,8 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 
 Chaque notification embarque `data: { menage_id, type }` pour router vers le ménage au tap.
 
+**Anti-abus** : rate-limit global 100 req/min/IP, + limites serrées sur les endpoints « bruyants » (`POST /comments` 20/min, `POST /menages/:id/responses` 30/min, `POST /reschedule-requests` 10/min), + **throttle par destinataire** dans `sendPushToUsers` (max 8 push/min/user, fenêtre glissante en mémoire) pour qu'un abus ne noie pas la victime.
+
 > **URLs de fichiers signées à la lecture** (token TTL 5 min, comme `/files`) : `avatar_url` (`/auth/me` + listes), `cover_photo_url` du logement (liste + détail), `photo_url` des pièces (`/logement-rooms`), `arrival_photo_url`/`departure_photo_url` du ménage (détail, liste, réponses pointage), et `url`/`thumbnail_url` des photos (`/photos`). Les URLs externes (ne contenant pas `/files/`) sont laissées intactes.
 
 ## Préférences de notifications

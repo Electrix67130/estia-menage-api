@@ -42,7 +42,7 @@ export default fp(
       return comment;
     });
 
-    fastify.post('/comments', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    fastify.post('/comments', { preHandler: [fastify.authenticate], config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
       const data = createCommentSchema.parse(request.body);
       await requirePermissionForMenage(fastify.db, request.user.sub, data.menage_id, 'view_comments');
 
