@@ -187,7 +187,7 @@ Mapping `n_*` → kind :
 
 ## Logement room
 
-Pièces du logement (chambre, salle de bain, etc). Permet d'attacher des photos par pièce et de construire un template de checklist par pièce.
+Pièces du logement, **100% personnalisables** : nom libre + photo de couverture (`photo_url`). Plus de type imposé ni d'auto-génération — l'utilisateur ajoute les pièces qu'il veut.
 
 | Méthode | Endpoint | Description |
 |---|---|---|
@@ -201,14 +201,14 @@ Pièces du logement (chambre, salle de bain, etc). Permet d'attacher des photos 
 ```json
 {
   "logement_id": "uuid",
-  "name": "Chambre parentale",
-  "kind": "chambre",
+  "name": "Suite parentale du fond",
+  "photo_url": "https://api.estia-clean-connect.fr/files/<uuid>.jpg",
   "position": 0,
   "notes": "Lit king size"
 }
 ```
 
-`kind` ∈ `chambre, salle_de_bain, wc, cuisine, salon, salle_a_manger, bureau, entree, couloir, exterieur, cave, buanderie, autre`.
+`name` est libre. `photo_url` (optionnel) est signé à la lecture. `kind` est conservé en legacy (optionnel) mais n'est plus imposé ni utilisé par l'UI.
 
 ---
 
@@ -779,7 +779,7 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 
 Chaque notification embarque `data: { menage_id, type }` pour router vers le ménage au tap.
 
-> **URLs de fichiers signées à la lecture** (token TTL 5 min, comme `/files`) : `avatar_url` (`/auth/me` + listes), `cover_photo_url` du logement (liste + détail), `arrival_photo_url`/`departure_photo_url` du ménage (détail, liste, réponses pointage), et `url`/`thumbnail_url` des photos (`/photos`). Les URLs externes (ne contenant pas `/files/`) sont laissées intactes.
+> **URLs de fichiers signées à la lecture** (token TTL 5 min, comme `/files`) : `avatar_url` (`/auth/me` + listes), `cover_photo_url` du logement (liste + détail), `photo_url` des pièces (`/logement-rooms`), `arrival_photo_url`/`departure_photo_url` du ménage (détail, liste, réponses pointage), et `url`/`thumbnail_url` des photos (`/photos`). Les URLs externes (ne contenant pas `/files/`) sont laissées intactes.
 
 ## Pages web (pont email → app)
 

@@ -2,7 +2,6 @@ import fp from 'fastify-plugin';
 import { z } from 'zod';
 import LogementService from './logement.service';
 import { createLogementSchema, updateLogementSchema, LogementRow } from './logement.schema';
-import LogementRoomService from '@/modules/logement-room/logement-room.service';
 import { computeConsommableAlerts } from '@/modules/logement-consommable/logement-consommable.service';
 import { getActiveMembership } from '@/lib/active-membership';
 import { geocodeAddress } from '@/lib/geocode';
@@ -39,7 +38,6 @@ const uuidSchema = z.object({ id: z.string().uuid() });
 export default fp(
   (fastify, _opts, done) => {
     const service = new LogementService(fastify.db);
-    const roomService = new LogementRoomService(fastify.db);
 
     // GET /logements — liste des logements actifs de l'organisation active
     // Admin : tous les logements de l'org. Non-admin : uniquement ceux où il
@@ -111,23 +109,8 @@ export default fp(
         created_by: request.user.sub,
         organization_id: membership.organization_id,
       });
-      // Génère automatiquement les pièces (Chambre 1, Chambre 2, SDB, Salon, ...)
-      // selon les counts saisis. Pas bloquant : si ça plante, le logement existe
-      // déjà — un PATCH suivant pourra re-générer.
-      try {
-        await roomService.generateForLogement(row.id, {
-          n_bedrooms: row.n_bedrooms,
-          n_bathrooms: row.n_bathrooms,
-          n_wc: row.n_wc,
-          n_kitchens: row.n_kitchens,
-          n_living_rooms: row.n_living_rooms,
-          n_exterior_spaces: row.n_exterior_spaces,
-          has_basement: row.has_basement,
-          has_laundry: row.has_laundry,
-        });
-      } catch (err) {
-        fastify.log.error({ err, logementId: row.id }, 'failed to auto-generate rooms');
-      }
+      // Plus d'auto-génération de pièces : elles sont 100% manuelles
+      // (nom libre + photo) via /logement-rooms.
       return reply.code(201).send(row);
     });
 
@@ -162,25 +145,7 @@ export default fp(
             })
           : data;
       const updated = await service.update(id, enriched);
-      // Ajoute les pièces manquantes si l'admin a augmenté un count (ex : 2→3
-      // chambres). Les pièces existantes ne sont pas touchées. La suppression
-      // d'une pièce reste manuelle via /logement-rooms/:id.
-      if (updated) {
-        try {
-          await roomService.generateForLogement(updated.id, {
-            n_bedrooms: updated.n_bedrooms,
-            n_bathrooms: updated.n_bathrooms,
-            n_wc: updated.n_wc,
-            n_kitchens: updated.n_kitchens,
-            n_living_rooms: updated.n_living_rooms,
-            n_exterior_spaces: updated.n_exterior_spaces,
-            has_basement: updated.has_basement,
-            has_laundry: updated.has_laundry,
-          });
-        } catch (err) {
-          fastify.log.error({ err, logementId: updated.id }, 'failed to refresh rooms');
-        }
-      }
+      // Plus d'auto-génération/refresh de pièces : gestion manuelle via /logement-rooms.
       return updated;
     });
 

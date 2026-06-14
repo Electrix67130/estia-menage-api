@@ -239,19 +239,20 @@ INDEX : `(menage_id, created_at)`, `(section_id)`.
 INDEX : `(organization_id)`, `(siret)`.
 
 ### `logement_room`
-Pièces d'un logement (chambre, salle de bain, etc).
+Pièces d'un logement, **100% personnalisables** : nom libre + photo de couverture. Plus d'auto-génération depuis les compteurs ni de type imposé (depuis migration 20260614100000).
 
 | Col | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
 | logement_id | uuid FK logement CASCADE notnull | |
-| name | varchar(200) notnull | |
-| kind | varchar(50) | `chambre`, `salle_de_bain`, `wc`, `cuisine`, `salon`, `salle_a_manger`, `bureau`, `entree`, `couloir`, `exterieur`, `cave`, `buanderie`, `autre` |
+| name | varchar(200) notnull | nom libre saisi par l'utilisateur |
+| photo_url | varchar(500) | photo de couverture de la pièce (URL `/files`, signée à la lecture) |
+| kind | varchar(50) | **legacy/optionnel** — conservé pour rétro-compat, plus imposé ni utilisé pour l'UI |
 | position | int | tri |
 | notes | text | |
 | created_at, updated_at | timestamp | |
 
-INDEX : `(logement_id)`.
+INDEX : `(logement_id)`. Auto-génération `generateForLogement` **désactivée** (les pièces ne sont plus créées depuis les compteurs `n_*` du logement).
 
 ### `logement_check_template_section` / `logement_check_template_item`
 Template de checklist paramétrable par logement. Utilisé à la création d'un ménage si présent, sinon fallback sur le plan par défaut basé sur les attributs du logement.

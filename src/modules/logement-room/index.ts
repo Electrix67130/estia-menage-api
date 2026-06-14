@@ -6,6 +6,7 @@ import {
   updateLogementRoomSchema,
 } from './logement-room.schema';
 import { getActiveMembership } from '@/lib/active-membership';
+import { signFields, signUrlsInList } from '@/lib/sign-url';
 
 const byLogementSchema = z.object({ logement_id: z.string().uuid() });
 const uuidSchema = z.object({ id: z.string().uuid() });
@@ -33,7 +34,7 @@ export default fp(
         if (!membership) return reply.code(403).send({ statusCode: 403, error: 'Forbidden', message: 'No active organization' });
         const ok = await assertLogementBelongsToOrg(fastify.db, logement_id, membership.organization_id);
         if (!ok) return reply.notFound('Logement not found');
-        return service.findByLogement(logement_id);
+        return signUrlsInList(await service.findByLogement(logement_id), ['photo_url']);
       },
     );
 
@@ -49,7 +50,7 @@ export default fp(
         if (!membership) return reply.notFound('Room not found');
         const ok = await assertLogementBelongsToOrg(fastify.db, room.logement_id, membership.organization_id);
         if (!ok) return reply.notFound('Room not found');
-        return room;
+        return signFields(room, ['photo_url']);
       },
     );
 
@@ -63,7 +64,7 @@ export default fp(
       const ok = await assertLogementBelongsToOrg(fastify.db, data.logement_id, membership.organization_id);
       if (!ok) return reply.notFound('Logement not found');
       const row = await service.create(data);
-      return reply.code(201).send(row);
+      return reply.code(201).send(signFields(row, ['photo_url']));
     });
 
     // PATCH /logement-rooms/:id — admin
@@ -78,7 +79,8 @@ export default fp(
       }
       const ok = await assertLogementBelongsToOrg(fastify.db, existing.logement_id, membership.organization_id);
       if (!ok) return reply.notFound('Room not found');
-      return service.update(id, data);
+      const updated = await service.update(id, data);
+      return updated ? signFields(updated, ['photo_url']) : updated;
     });
 
     // DELETE /logement-rooms/:id — admin
