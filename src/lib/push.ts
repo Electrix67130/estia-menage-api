@@ -9,6 +9,46 @@ import { Knex } from 'knex';
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const CHUNK_SIZE = 100;
 
+/**
+ * Catégories de préférences de notifications (toggles côté app). Une catégorie
+ * désactivée (`notification_prefs[cat] === false`) coupe les push associés.
+ */
+export const NOTIFICATION_CATEGORIES = [
+  'assignment', // ménages assignés / modifiés / annulés / retirés
+  'available', // nouveaux ménages disponibles + relances
+  'reminders', // rappels veille / 2h avant
+  'reschedule', // demandes & réponses de report
+  'presence', // réponses présent/absent
+  'pointage', // arrivées / départs
+  'validation', // ménages validés
+  'comments', // nouveaux commentaires
+  'consumables', // consommables à racheter
+  'invitations', // invitations acceptées
+] as const;
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+
+/** Mappe le `data.type` d'une push vers sa catégorie de préférence. */
+const CATEGORY_FOR_TYPE: Record<string, NotificationCategory> = {
+  assignment: 'assignment',
+  updated: 'assignment',
+  cancelled: 'assignment',
+  unassigned: 'assignment',
+  available: 'available',
+  relance: 'available',
+  reminder_eve: 'reminders',
+  reminder_2h: 'reminders',
+  reschedule_request: 'reschedule',
+  reschedule_decision: 'reschedule',
+  reschedule_cancelled: 'reschedule',
+  response: 'presence',
+  arrival: 'pointage',
+  departure: 'pointage',
+  validated: 'validation',
+  comment: 'comments',
+  consumables_low: 'consumables',
+  invitation_accepted: 'invitations',
+};
+
 export interface PushMessage {
   title: string;
   body: string;
@@ -41,8 +81,25 @@ export async function sendPushToUsers(
   const uniqueUserIds = [...new Set(userIds)].filter(Boolean);
   if (uniqueUserIds.length === 0) return;
 
+  // Filtre selon les préférences de notifications du user pour cette catégorie.
+  const category = CATEGORY_FOR_TYPE[String(message.data?.type ?? '')];
+  let recipientIds = uniqueUserIds;
+  if (category) {
+    const prefRows = (await db('user')
+      .whereIn('id', uniqueUserIds)
+      .select('id', 'notification_prefs')) as {
+      id: string;
+      notification_prefs: Record<string, boolean> | null;
+    }[];
+    const disabled = new Set(
+      prefRows.filter((r) => r.notification_prefs?.[category] === false).map((r) => r.id),
+    );
+    recipientIds = uniqueUserIds.filter((id) => !disabled.has(id));
+  }
+  if (recipientIds.length === 0) return;
+
   const rows = (await db('device_token')
-    .whereIn('user_id', uniqueUserIds)
+    .whereIn('user_id', recipientIds)
     .select('token')) as { token: string }[];
   const tokens = rows.map((r) => r.token);
   if (tokens.length === 0) return;

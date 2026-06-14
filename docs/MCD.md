@@ -480,6 +480,9 @@ Backfill : pour les rows existantes non-prestataire, les 3 flags sont mis à `tr
 - `laundry_client_price_ht` decimal(10,2)
 - `laundry_provider_price` decimal(10,2)
 
+### `user` (ajout préférences notifs)
+- `notification_prefs` jsonb notnull défaut `{}` — préférences push par catégorie ; une catégorie est coupée si sa valeur vaut `false` (migration 20260614110000). Catégories : assignment, available, reminders, reschedule, presence, pointage, validation, comments, consumables, invitations.
+
 ### `menage` (ajouts rappels push)
 - `reminder_eve_sent_at` timestamp — rappel « veille 18h » envoyé (ou relance si non assigné). Anti-doublon worker.
 - `reminder_2h_sent_at` timestamp — rappel « 2h avant l'horaire » envoyé. Géré par `reminder-worker` (tick 15 min, Europe/Paris).

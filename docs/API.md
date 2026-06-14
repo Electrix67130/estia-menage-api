@@ -781,6 +781,17 @@ Chaque notification embarque `data: { menage_id, type }` pour router vers le mé
 
 > **URLs de fichiers signées à la lecture** (token TTL 5 min, comme `/files`) : `avatar_url` (`/auth/me` + listes), `cover_photo_url` du logement (liste + détail), `photo_url` des pièces (`/logement-rooms`), `arrival_photo_url`/`departure_photo_url` du ménage (détail, liste, réponses pointage), et `url`/`thumbnail_url` des photos (`/photos`). Les URLs externes (ne contenant pas `/files/`) sont laissées intactes.
 
+## Préférences de notifications
+
+Chaque utilisateur peut couper certaines catégories de push. Par défaut tout est activé ; `sendPushToUsers` filtre les destinataires selon leur préférence pour la catégorie du `data.type`.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/notification-preferences` | État de chaque catégorie (`{ assignment: true, comments: false, … }`). Authentifié. |
+| PATCH | `/notification-preferences` | Active/désactive une catégorie — body `{ key, enabled }`. |
+
+Catégories : `assignment` (assigné/modifié/annulé/retiré), `available` (dispo + relances), `reminders` (rappels veille/2h), `reschedule` (reports), `presence` (présent/absent), `pointage` (arrivée/départ), `validation`, `comments`, `consumables`, `invitations`.
+
 ## Pages web (pont email → app)
 
 Pages HTML publiques (pas d'API key) servant de relais depuis les emails : elles tentent d'ouvrir l'app via le deep link `estia-clean-connect://…` et proposent une retombée.
