@@ -40,6 +40,24 @@ export default fp(
       return reply.code(201).send(invitation);
     });
 
+    // POST /invitations/:id/resend — resend an invitation email (admin only, org-scoped)
+    fastify.post('/invitations/:id/resend', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+      const { id } = uuidParamSchema.parse(request.params);
+      const membership = await getActiveMembership(fastify.db, request.user.sub);
+      if (membership?.role !== 'admin') {
+        return reply.code(403).send({ statusCode: 403, error: 'Forbidden', message: 'Only admins can resend invitations' });
+      }
+      const existing = await service.findById(id);
+      if (!existing || existing.organization_id !== membership.organization_id) {
+        return reply.notFound('Invitation not found');
+      }
+      if (existing.status === 'accepted') {
+        return reply.code(409).send({ statusCode: 409, error: 'Conflict', message: 'Cette invitation a déjà été acceptée' });
+      }
+      const updated = await service.resend(id);
+      return updated;
+    });
+
     // GET /invitations/by-token/:token — get invitation info (email + role + org) to prefill signup
     fastify.get('/invitations/by-token/:token', async (request, reply) => {
       const { token } = tokenParamSchema.parse(request.params);

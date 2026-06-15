@@ -49,6 +49,32 @@ class InvitationService extends BaseService<InvitationRow> {
     return invitation;
   }
 
+  /** Renvoie une invitation existante : rafraîchit l'expiration (+7j), repasse en
+   * pending si besoin, et renvoie l'email avec le token existant. */
+  async resend(id: string): Promise<InvitationRow | undefined> {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + EXPIRES_IN_DAYS);
+    const [updated] = (await this.db(this.table)
+      .where({ id })
+      .update({ expires_at: expiresAt.toISOString(), status: 'pending' })
+      .returning('*')) as InvitationRow[];
+    if (!updated) return undefined;
+
+    const inviter = await this.db('user').where({ id: updated.invited_by }).first();
+    const inviterName = inviter
+      ? `${inviter.first_name} ${inviter.last_name}`.trim()
+      : 'Estia Clean Connect';
+    const { subject, html } = buildInvitationEmail({
+      inviterName,
+      email: updated.email,
+      role: updated.role || 'prestataire',
+      token: updated.token,
+      expiresAt: updated.expires_at,
+    });
+    await sendMail({ to: updated.email, subject, html });
+    return updated;
+  }
+
   /** Find a pending invitation by token */
   async findByToken(token: string): Promise<InvitationRow | undefined> {
     return this.findOne({ token, status: 'pending' } as Partial<InvitationRow>);

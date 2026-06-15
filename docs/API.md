@@ -75,8 +75,10 @@ Réponses paginées : `{ data: [...], meta: { total, page, limit, totalPages } }
 | Méthode | Endpoint | Description |
 |---|---|---|
 | POST | `/invitations` | Crée invitation (admin) |
+| POST | `/invitations/:id/resend` | Renvoie l'email + rafraîchit l'expiration +7j (admin, org-scoped) |
 | GET | `/invitations/by-token?token=` | Vérifie un token |
 | POST | `/invitations/accept` | Accepte invitation (lors de register) |
+| DELETE | `/invitations/:id` | Annule une invitation |
 
 ---
 
