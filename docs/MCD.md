@@ -2,7 +2,7 @@
 
 Base : **PostgreSQL 17** · ORM : **Knex 3** · IDs : `uuid` (default `uuid()`).
 
-## Tables (29)
+## Tables (31)
 
 ### `user`
 | Col | Type | Notes |
@@ -450,9 +450,46 @@ Tokens push Expo par appareil (multi-device) pour les notifications push (migrat
 | platform | varchar(16) | `ios` / `android` |
 | created_at, updated_at | timestamp | INDEX `(user_id)` |
 
+### `invoice`
+Facture ou devis émis à un client, regroupant des ménages (migration 20260616120000).
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| organization_id | uuid FK organization CASCADE notnull | |
+| client_id | uuid FK client SET NULL | destinataire |
+| type | varchar(10) notnull défaut `invoice` | `invoice` (facture) / `quote` (devis) |
+| number | varchar(30) | n° séquentiel légal, NULL tant que brouillon (attribué à la finalisation, sans trou) |
+| status | varchar(20) notnull défaut `draft` | `draft/sent/paid/cancelled` (facture) · `draft/sent/accepted/refused` (devis) |
+| issue_date, due_date | date | |
+| period_start, period_end | date | période facturée (mois/semaine) |
+| currency | varchar(3) défaut `EUR` | |
+| total_ht, total_tva, total_ttc | decimal(10,2) | calculés depuis les lignes |
+| notes | text | |
+| created_by | uuid FK user SET NULL | |
+| created_at, updated_at | timestamp | INDEX `(organization_id)`, `(client_id)` |
+
+### `invoice_line`
+Ligne de facture (1 par ménage en général).
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| invoice_id | uuid FK invoice CASCADE notnull | |
+| menage_id | uuid FK menage SET NULL | ménage facturé (NULL = ligne manuelle) |
+| label | text notnull | ex : « Ménage du 03/06/2026 — Appartement X » |
+| quantity | decimal(10,2) défaut 1 | |
+| unit_price_ht, vat_rate | decimal | prix unitaire HT, taux TVA % |
+| line_ht, line_tva, line_ttc | decimal(10,2) | totaux ligne |
+| position | int | tri · INDEX `(invoice_id)`, `(menage_id)` |
+
 ---
 
 ## Évolutions de tables existantes
+
+### `menage` (ajouts paie prestataire)
+- `provider_paid_at` timestamp — date de paiement du prestataire pour ce ménage (NULL = à payer).
+- `provider_paid_by` uuid FK user SET NULL — qui a marqué payé. (migration 20260616120000)
 
 ### `logement` (ajout)
 - `client_id` uuid FK `client` SET NULL — rattachement à une fiche client.

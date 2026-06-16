@@ -808,6 +808,24 @@ Pages HTML publiques (pas d'API key) servant de relais depuis les emails : elles
 
 ---
 
+## Facturation (admin only, org-scoped)
+
+Factures + devis regroupant des ménages d'un client (1 ligne/ménage, prix HT/TVA déjà sur le ménage). Génération par **ménages explicites** ou **client + période** (semaine/mois). Numérotation séquentielle légale (sans trou), attribuée à la finalisation. PDF via pdfkit. Anti double-facturation : un ménage déjà sur une facture non annulée est ignoré.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/invoices?type=&status=&client_id=` | Liste (factures + devis) |
+| POST | `/invoices` | Génère un brouillon — body `{ client_id, type, period_start?, period_end?, menage_ids?, due_date?, notes? }` |
+| GET | `/invoices/:id` | Facture + lignes |
+| PATCH | `/invoices/:id` | `{ status?, due_date?, notes? }` — passage hors `draft` attribue le numéro |
+| DELETE | `/invoices/:id` | Supprime (brouillon uniquement) |
+| GET | `/invoices/:id/pdf` | PDF téléchargeable (facture/devis) |
+| GET | `/invoices/export.csv?from=&to=` | Export comptable CSV (factures numérotées) |
+| GET | `/invoices/provider-recap` | Montants à payer aux prestataires (ménages réalisés non payés, par presta) |
+| POST | `/invoices/provider-payments` | Marque des ménages payés/non payés au presta — body `{ menage_ids, paid }` |
+
+`type` : `invoice` (facture) \| `quote` (devis). `status` : `draft/sent/paid/cancelled` (facture), `draft/sent/accepted/refused` (devis).
+
 ## WebSocket
 
 `GET /ws?token=<jwt>` — connexion temps réel.
