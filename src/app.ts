@@ -29,7 +29,10 @@ function buildApp(opts: AppOptions = {}) {
   });
 
   // Security plugins
-  app.register(helmet);
+  // CORP par défaut de helmet = 'same-origin' → bloque le chargement des fichiers
+  // de l'API (avatars, photos logement, logo email) dans le dashboard web
+  // (origine différente). On autorise le cross-origin pour les ressources servies.
+  app.register(helmet, { crossOriginResourcePolicy: { policy: 'cross-origin' } });
   app.register(cors, { origin: true, methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'] });
   app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
   app.register(sensible);
