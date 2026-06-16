@@ -21,16 +21,38 @@ class InvitationService extends BaseService<InvitationRow> {
     if (!inviter?.active_organization_id) {
       throw Object.assign(new Error('Inviter has no active organization'), { statusCode: 400 });
     }
+    const organizationId = inviter.active_organization_id;
 
-    const invitation = await this.create({
-      email: data.email,
-      invited_by: invitedBy,
-      role: data.role,
-      token: randomUUID(),
-      status: 'pending',
-      expires_at: expiresAt.toISOString(),
-      organization_id: inviter.active_organization_id,
-    } as Partial<InvitationRow>);
+    // Anti-doublon : si une invitation est déjà en attente pour ce couple
+    // (email, organisation), on la met à jour (nouveau token + expiration + rôle)
+    // au lieu d'en créer une seconde.
+    const existingPending = await this.db('invitation')
+      .where({ email: data.email, organization_id: organizationId, status: 'pending' })
+      .first();
+
+    let invitation: InvitationRow;
+    if (existingPending) {
+      const [updated] = (await this.db('invitation')
+        .where({ id: existingPending.id })
+        .update({
+          invited_by: invitedBy,
+          role: data.role,
+          token: randomUUID(),
+          expires_at: expiresAt.toISOString(),
+        })
+        .returning('*')) as InvitationRow[];
+      invitation = updated;
+    } else {
+      invitation = await this.create({
+        email: data.email,
+        invited_by: invitedBy,
+        role: data.role,
+        token: randomUUID(),
+        status: 'pending',
+        expires_at: expiresAt.toISOString(),
+        organization_id: organizationId,
+      } as Partial<InvitationRow>);
+    }
 
     // Build inviter name for the email (reuse earlier fetched row)
     const inviterName = `${inviter.first_name} ${inviter.last_name}`;
