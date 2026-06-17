@@ -21,6 +21,8 @@ export default fp(
     fastify.get('/invitations', { preHandler: [fastify.authenticate] }, async (request) => {
       const query = paginationSchema.parse(request.query);
       const orgId = await getUserOrganizationId(fastify.db, request.user.sub);
+      // Assainit les invitations orphelines (email déjà membre) avant de lister.
+      await service.reconcileAccepted(orgId);
       const { page = 1, limit = 20 } = query;
       const baseQuery = fastify.db('invitation').where('organization_id', orgId);
       const [{ count }] = (await baseQuery.clone().count('* as count')) as { count: string }[];

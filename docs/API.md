@@ -74,9 +74,10 @@ Réponses paginées : `{ data: [...], meta: { total, page, limit, totalPages } }
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| POST | `/invitations` | Crée invitation (admin) |
+| POST | `/invitations` | Crée invitation (admin). Réutilise une invitation `pending`/`expired` existante pour le même email (dédup + purge des doublons) au lieu d'en créer une nouvelle. `409` si l'email est déjà membre de l'org. |
 | POST | `/invitations/:id/resend` | Renvoie l'email + rafraîchit l'expiration +7j (admin, org-scoped) |
 | GET | `/invitations/by-token?token=` | Vérifie un token |
+| GET | `/invitations` | Liste (org-scoped). Réconcilie au passage : marque `accepted` les invitations `pending`/`expired` dont l'email est déjà membre de l'org. |
 | POST | `/invitations/accept` | Accepte invitation (lors de register) |
 | DELETE | `/invitations/:id` | Annule une invitation |
 

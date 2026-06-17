@@ -23,21 +23,44 @@ class InvitationService extends BaseService<InvitationRow> {
     }
     const organizationId = inviter.active_organization_id;
 
-    // Anti-doublon : si une invitation est déjà en attente pour ce couple
-    // (email, organisation), on la met à jour (nouveau token + expiration + rôle)
-    // au lieu d'en créer une seconde.
-    const existingPending = await this.db('invitation')
-      .where({ email: data.email, organization_id: organizationId, status: 'pending' })
+    // Refuse d'inviter un email qui est déjà membre de l'organisation.
+    const existingUser = await this.db('user')
+      .whereRaw('lower(email) = lower(?)', [data.email])
       .first();
+    if (existingUser) {
+      const alreadyMember = await this.db('organization_member')
+        .where({ user_id: existingUser.id, organization_id: organizationId })
+        .first();
+      if (alreadyMember) {
+        throw Object.assign(
+          new Error('Cet utilisateur est déjà membre de votre organisation'),
+          { statusCode: 409 },
+        );
+      }
+    }
+
+    // Anti-doublon élargi : réutilise une invitation `pending` OU `expired` pour
+    // ce couple (email, organisation) — et supprime les éventuels doublons — au
+    // lieu d'en créer une nouvelle. (Une invitation `accepted` n'est jamais
+    // réutilisée : la personne a déjà rejoint l'org.)
+    const reusable = (await this.db('invitation')
+      .where({ organization_id: organizationId })
+      .whereRaw('lower(email) = lower(?)', [data.email])
+      .whereIn('status', ['pending', 'expired'])
+      .orderBy('created_at', 'desc')) as InvitationRow[];
 
     let invitation: InvitationRow;
-    if (existingPending) {
+    if (reusable.length > 0) {
+      const keep = reusable[0];
+      const extra = reusable.slice(1).map((r) => r.id);
+      if (extra.length) await this.db('invitation').whereIn('id', extra).del();
       const [updated] = (await this.db('invitation')
-        .where({ id: existingPending.id })
+        .where({ id: keep.id })
         .update({
           invited_by: invitedBy,
           role: data.role,
           token: randomUUID(),
+          status: 'pending',
           expires_at: expiresAt.toISOString(),
         })
         .returning('*')) as InvitationRow[];
@@ -69,6 +92,30 @@ class InvitationService extends BaseService<InvitationRow> {
     await sendMail({ to: data.email, subject, html });
 
     return invitation;
+  }
+
+  /**
+   * Assainit les invitations orphelines : marque `accepted` celles restées
+   * `pending`/`expired` dont l'email a déjà rejoint l'organisation (la personne
+   * est devenue membre autrement que par cette invitation).
+   */
+  async reconcileAccepted(organizationId: string): Promise<void> {
+    const memberEmails = new Set(
+      ((await this.db('organization_member')
+        .join('user', 'user.id', 'organization_member.user_id')
+        .where('organization_member.organization_id', organizationId)
+        .pluck('user.email')) as string[]).map((e) => e.toLowerCase()),
+    );
+    if (memberEmails.size === 0) return;
+    const orphans = (await this.db('invitation')
+      .where({ organization_id: organizationId })
+      .whereIn('status', ['pending', 'expired'])
+      .select('id', 'email')) as { id: string; email: string }[];
+    const toAccept = orphans
+      .filter((o) => memberEmails.has(o.email.toLowerCase()))
+      .map((o) => o.id);
+    if (toAccept.length === 0) return;
+    await this.db('invitation').whereIn('id', toAccept).update({ status: 'accepted' });
   }
 
   /** Renvoie une invitation existante : rafraîchit l'expiration (+7j), repasse en
