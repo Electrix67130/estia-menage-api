@@ -21,6 +21,9 @@ export const updateUserSchema = z.object({
   company_name: z.string().max(200).optional(),
   /** Entreprise propre du prestataire — éditable par lui-même (non propagée). */
   provider_company: z.string().max(200).nullable().optional(),
+  provider_siret: z.string().max(20).nullable().optional(),
+  provider_vat_number: z.string().max(20).nullable().optional(),
+  provider_address: z.string().max(300).nullable().optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -38,6 +41,9 @@ export type UserRow = {
   role: 'admin' | 'prestataire';
   company_name?: string;
   provider_company?: string | null;
+  provider_siret?: string | null;
+  provider_vat_number?: string | null;
+  provider_address?: string | null;
   is_active: boolean;
   organization_id: string;
   created_at: string;
