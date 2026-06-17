@@ -51,7 +51,7 @@ Réponses paginées : `{ data: [...], meta: { total, page, limit, totalPages } }
 | GET | `/users` | Liste des users de l'org (admin) ou co-membres de logements |
 | GET | `/users/search?q=...` | Recherche par nom/email |
 | GET | `/users/:id` | Profil |
-| PATCH | `/users/:id` | Édite son propre profil (ou admin pour role/is_active) |
+| PATCH | `/users/:id` | Édite son propre profil (ou admin pour role/is_active). `company_name` = admin-only (propagé org-wide + sync `organization.name`) ; `provider_company` = entreprise perso du prestataire, éditable par lui-même, non propagée |
 | DELETE | `/users/:id` | Admin only |
 
 ---

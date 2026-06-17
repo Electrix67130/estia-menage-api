@@ -14,7 +14,8 @@ Base : **PostgreSQL 17** · ORM : **Knex 3** · IDs : `uuid` (default `uuid()`).
 | phone | varchar(20) | |
 | avatar_url | varchar(500) | |
 | role | enum `user_role` notnull default `prestataire` | `admin`, `prestataire` |
-| company_name | varchar(200) | |
+| company_name | varchar(200) | Entreprise de l'organisation (propagée à tous les membres par un admin) |
+| provider_company | varchar(200) nullable | Entreprise propre du prestataire (perso, éditable par lui-même, non propagée) |
 | is_active | boolean notnull default true | |
 | organization_id | uuid FK organization | nullable initialement (rempli au register) |
 | active_organization_id | uuid FK organization SET NULL | multi-org |
