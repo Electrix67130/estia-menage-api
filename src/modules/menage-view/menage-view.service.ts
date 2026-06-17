@@ -34,10 +34,13 @@ class MenageViewService extends BaseService<MenageViewRow> {
 
   /** Compteurs détaillés pour un ménage précis. */
   async getUnreadForMenage(userId: string, menageId: string): Promise<UnreadCounts> {
-    const [comments, stepRows, photos] = await Promise.all([
+    const [comments, stepRows, photos, commentsView] = await Promise.all([
       this.countComments(userId, [menageId], 'general', 'comments'),
       this.unreadStepRows(userId, menageId),
       this.countPhotos(userId, [menageId]),
+      this.db('menage_view')
+        .where({ user_id: userId, menage_id: menageId, tab: 'comments' })
+        .first('last_viewed_at') as Promise<{ last_viewed_at: string } | undefined>,
     ]);
     const unread_step_ids = [...new Set(stepRows.map((r) => r.section_id))];
     return {
@@ -49,6 +52,7 @@ class MenageViewService extends BaseService<MenageViewRow> {
       emergencies_claim: 0,
       unread_step_ids,
       unread_emergency_ids: [],
+      comments_last_viewed_at: commentsView?.last_viewed_at ?? null,
     };
   }
 

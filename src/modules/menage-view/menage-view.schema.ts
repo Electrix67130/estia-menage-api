@@ -51,6 +51,10 @@ export type UnreadCounts = {
   emergencies_claim: number;
   unread_step_ids: string[];
   unread_emergency_ids: string[];
+  /** Dernière consultation de l'onglet commentaires (général) — null si jamais
+   * consulté. Permet au client de marquer chaque commentaire postérieur comme
+   * non lu. */
+  comments_last_viewed_at: string | null;
 };
 
 export type UnreadSummary = {
