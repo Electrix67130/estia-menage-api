@@ -1,10 +1,7 @@
 import PDFDocument from 'pdfkit';
-import path from 'path';
-import fs from 'fs';
 import { InvoiceRow, InvoiceLineRow } from '@/modules/invoice/invoice.schema';
 
 const BRAND = '#2563EB';
-const LOGO_PATH = path.join(__dirname, '..', '..', 'assets', 'logo-estia.png');
 
 export interface InvoicePdfParty {
   name: string;
@@ -44,13 +41,9 @@ export function generateInvoicePdf(params: {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    // --- En-tête : logo + émetteur ---
-    try {
-      if (fs.existsSync(LOGO_PATH)) doc.image(LOGO_PATH, 50, 45, { height: 60 });
-    } catch {
-      /* logo optionnel */
-    }
-    doc.fontSize(16).fillColor(BRAND).text(org.name, 130, 50);
+    // --- En-tête : émetteur (organisation) — pas de logo codé en dur,
+    // multi-tenant : on affiche le nom + les coordonnées de l'organisation. ---
+    doc.fontSize(18).fillColor(BRAND).text(org.name, 50, 50, { width: 350 });
     doc.fontSize(9).fillColor('#444');
     const orgLines = [
       [org.address, [org.postal_code, org.city].filter(Boolean).join(' ')].filter(Boolean).join(', '),
@@ -58,7 +51,7 @@ export function generateInvoicePdf(params: {
       org.vat_number ? `TVA ${org.vat_number}` : '',
       [org.email, org.phone].filter(Boolean).join(' · '),
     ].filter(Boolean);
-    doc.text(orgLines.join('\n'), 130, 72);
+    doc.text(orgLines.join('\n'), 50, 76, { width: 350 });
 
     // --- Titre + méta ---
     doc.moveDown(2);
@@ -68,7 +61,7 @@ export function generateInvoicePdf(params: {
     doc.text(`Date : ${frDate(invoice.issue_date)}`, 50, 186);
     if (invoice.due_date) doc.text(`Échéance : ${frDate(invoice.due_date)}`, 50, 200);
     if (invoice.period_start && invoice.period_end) {
-      doc.text(`Période : ${frDate(invoice.period_start)} → ${frDate(invoice.period_end)}`, 50, 214);
+      doc.text(`Période : ${frDate(invoice.period_start)} au ${frDate(invoice.period_end)}`, 50, 214);
     }
 
     // --- Client (bloc à droite) ---
