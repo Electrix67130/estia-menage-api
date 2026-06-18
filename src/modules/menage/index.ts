@@ -181,6 +181,16 @@ export default fp(
         logement,
       );
 
+      // Affectation à la création : synchroniser la table de jointure
+      // `menage_prestataire` (comme le PATCH). Sinon le presta assigné apparaît
+      // "non assigné" (vote vide) et le ménage reste visible des autres prestas
+      // du logement. Sa présence dans menage_prestataire = "Présent" verrouillé
+      // côté presta + invisibilité pour les autres.
+      if (data.prestataire_user_id) {
+        const presta = new MenagePrestataireService(fastify.db);
+        await presta.setMenagePrestataires(menage.id, [data.prestataire_user_id]);
+      }
+
       // Notif push à la création :
       // - assigné directement → on prévient le prestataire concerné ;
       // - sinon → on signale aux prestataires du logement qu'un ménage est dispo.
