@@ -28,6 +28,28 @@ function buildApp(opts: AppOptions = {}) {
     ...fastifyOpts,
   });
 
+  // Tolère un body vide sur les requêtes `application/json` : certains clients
+  // posent toujours ce Content-Type, même sur un DELETE/POST sans corps, ce qui
+  // déclenche sinon l'erreur Fastify « Body cannot be empty when content-type
+  // is set to 'application/json' ».
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (_req, body, done) => {
+      const str = typeof body === 'string' ? body : '';
+      if (str.trim() === '') {
+        done(null, undefined);
+        return;
+      }
+      try {
+        done(null, JSON.parse(str));
+      } catch (err) {
+        (err as { statusCode?: number }).statusCode = 400;
+        done(err as Error, undefined);
+      }
+    },
+  );
+
   // Security plugins
   // CORP par défaut de helmet = 'same-origin' → bloque le chargement des fichiers
   // de l'API (avatars, photos logement, logo email) dans le dashboard web
