@@ -151,6 +151,7 @@ export type MenageRow = {
   logement_color?: string | null;
   logement_latitude?: number | string | null;
   logement_longitude?: number | string | null;
+  logement_key_safe_code?: string | null;
   /** True s'il existe au moins une demande de report `pending` sur ce ménage. */
   has_pending_reschedule?: boolean;
   /**

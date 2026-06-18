@@ -35,6 +35,7 @@ class MenageService extends BaseService<MenageRow> {
         'logement.color as logement_color',
         'logement.latitude as logement_latitude',
         'logement.longitude as logement_longitude',
+        'logement.key_safe_code as logement_key_safe_code',
         this.db.raw(
           "EXISTS (SELECT 1 FROM menage_reschedule_request mrr WHERE mrr.menage_id = menage.id AND mrr.status = 'pending') as has_pending_reschedule",
         ),

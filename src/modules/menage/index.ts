@@ -161,14 +161,17 @@ export default fp(
         });
       }
       if (data.prestataire_user_id) {
-        const member = await fastify.db('logement_member')
-          .where({ logement_id: data.logement_id, user_id: data.prestataire_user_id })
+        // Affectation possible à tout prestataire de l'organisation (y compris
+        // un non-membre du logement, ex. remplacement) : il devient « Présent »
+        // sur CE ménage via menage_prestataire et y a accès.
+        const orgMember = await fastify.db('organization_member')
+          .where({ organization_id: membership.organization_id, user_id: data.prestataire_user_id })
           .first();
-        if (!member) {
+        if (!orgMember) {
           return reply.code(400).send({
             statusCode: 400,
             error: 'Bad Request',
-            message: 'Le prestataire doit être membre du logement',
+            message: "Le prestataire doit appartenir à l'organisation",
           });
         }
       }
@@ -242,14 +245,16 @@ export default fp(
       }
 
       if (data.prestataire_user_id) {
-        const member = await fastify.db('logement_member')
-          .where({ logement_id: existing.logement_id, user_id: data.prestataire_user_id })
+        // Remplacement possible : tout prestataire de l'organisation peut être
+        // affecté, même s'il n'est pas membre du logement.
+        const orgMember = await fastify.db('organization_member')
+          .where({ organization_id: existing.organization_id, user_id: data.prestataire_user_id })
           .first();
-        if (!member) {
+        if (!orgMember) {
           return reply.code(400).send({
             statusCode: 400,
             error: 'Bad Request',
-            message: 'Le prestataire doit être membre du logement',
+            message: "Le prestataire doit appartenir à l'organisation",
           });
         }
       }
