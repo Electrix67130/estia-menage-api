@@ -102,6 +102,8 @@ export type MenageRow = {
   prestataire_user_id: string | null;
   status: MenageStatus;
   date_prevue: string;
+  /** Prochain check-in du logement (date d'arrivée du prochain voyageur, via iCal). */
+  next_checkin_at: string | null;
   /** True quand la date a été manuellement override → la sync iCal ne l'écrase plus. */
   date_locked: boolean;
   horaire_prevu: string | null;
