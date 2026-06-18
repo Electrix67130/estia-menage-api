@@ -59,6 +59,7 @@ class MenageService extends BaseService<MenageRow> {
       logement_id,
       validated,
       unassigned,
+      closed,
       managerUserId,
       restrictToMember,
       from,
@@ -76,6 +77,8 @@ class MenageService extends BaseService<MenageRow> {
       if (validated === false) qb.whereNull('menage.validated_at');
       if (unassigned === true) qb.whereNull('menage.prestataire_user_id');
       if (unassigned === false) qb.whereNotNull('menage.prestataire_user_id');
+      if (closed === true) qb.whereIn('menage.status', ['valide', 'annule']);
+      if (closed === false) qb.whereNotIn('menage.status', ['valide', 'annule']);
       if (from) qb.where('menage.date_prevue', '>=', from);
       if (to) qb.where('menage.date_prevue', '<=', to);
       if (restrictToMember && managerUserId) {

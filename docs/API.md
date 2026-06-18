@@ -290,6 +290,8 @@ Chaque ménage sérialisé (liste **et** détail) inclut un booléen calculé **
 
 Filtre `unassigned=true` : ne retourne que les ménages sans prestataire (utile pour le calendrier admin). `unassigned=false` : que les ménages déjà affectés.
 
+Filtre `closed` : `closed=true` = uniquement les ménages clôturés (`valide`/`annule`) → Archives ; `closed=false` = worklist active (exclut `valide`/`annule`). Combinable avec `logement_id`, `prestataire_user_id`, `from`/`to`, pagination.
+
 `GET /me/earnings` réponse :
 ```json
 {

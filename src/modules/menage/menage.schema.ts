@@ -79,6 +79,12 @@ export const listMenagesSchema = z.object({
     .union([z.literal('true'), z.literal('false'), z.boolean()])
     .transform((v) => (v === 'true' ? true : v === 'false' ? false : v))
     .optional(),
+  /** `true` = uniquement les ménages clôturés (valide/annule) → Archives.
+   *  `false` = worklist active (exclut valide/annule). */
+  closed: z
+    .union([z.literal('true'), z.literal('false'), z.boolean()])
+    .transform((v) => (v === 'true' ? true : v === 'false' ? false : v))
+    .optional(),
   manager: z.literal('me').optional(),
   from: z.string().optional(),
   to: z.string().optional(),
