@@ -114,13 +114,14 @@ class LogementExternalCalendarService {
     const externalSource = `cal_${cal.provider}`;
     const existing = (await this.db('menage')
       .where({ external_calendar_id: cal.id })
-      .select('id', 'external_event_uid', 'date_prevue', 'status', 'date_locked', 'next_checkin_at')) as Array<{
+      .select('id', 'external_event_uid', 'date_prevue', 'status', 'date_locked', 'next_checkin_at', 'stay_nights')) as Array<{
       id: string;
       external_event_uid: string;
       date_prevue: string | Date;
       status: string;
       date_locked: boolean;
       next_checkin_at: string | Date | null;
+      stay_nights: number | null;
     }>;
     const existingByUid = new Map(existing.map((m) => [m.external_event_uid, m]));
     const seenUids = new Set<string>();
@@ -145,6 +146,15 @@ class LogementExternalCalendarService {
     const nextCheckinAfter = (checkout: string): string | null =>
       checkInDates.find((s) => s >= checkout) ?? null;
 
+    // Nb de nuits du séjour (checkout − checkin) — null si incohérent.
+    const nightsOf = (start: string, end: string): number | null => {
+      const a = new Date(`${start}T00:00:00Z`).getTime();
+      const b = new Date(`${end}T00:00:00Z`).getTime();
+      if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+      const n = Math.round((b - a) / 86_400_000);
+      return n > 0 ? n : null;
+    };
+
     for (const ev of events) {
       // Les blocages de dates (date fermée par l'hôte / résa importée d'un
       // autre site) ne sont pas de vraies réservations → pas de ménage. On ne
@@ -154,6 +164,7 @@ class LogementExternalCalendarService {
 
       seenUids.add(ev.uid);
       const nc = nextCheckinAfter(ev.end_date);
+      const nights = nightsOf(ev.start_date, ev.end_date);
       const prev = existingByUid.get(ev.uid);
       if (prev) {
         // UPDATE — si la date a changé OU si le ménage avait été annulé,
@@ -162,7 +173,8 @@ class LogementExternalCalendarService {
         const dateChanged = ymd(prev.date_prevue) !== ev.end_date;
         const wasCancelled = prev.status === 'annule';
         const ncChanged = (prev.next_checkin_at ? ymd(prev.next_checkin_at) : null) !== nc;
-        if (dateChanged || wasCancelled || ncChanged) {
+        const nightsChanged = (prev.stay_nights ?? null) !== nights;
+        if (dateChanged || wasCancelled || ncChanged || nightsChanged) {
           // Si la date a été verrouillée manuellement (admin a approuvé un
           // reschedule ou modifié la date à la main), on garde la date
           // locale et on se contente de ré-activer un ménage annulé.
@@ -170,6 +182,7 @@ class LogementExternalCalendarService {
           if (!prev.date_locked && dateChanged) update.date_prevue = ev.end_date;
           if (wasCancelled) update.status = 'a_venir';
           if (ncChanged) update.next_checkin_at = nc;
+          if (nightsChanged) update.stay_nights = nights;
           if (Object.keys(update).length > 1) {
             await this.db('menage').where({ id: prev.id }).update(update);
             result.updated_menages++;
@@ -187,6 +200,7 @@ class LogementExternalCalendarService {
         status: 'a_venir' as const,
         date_prevue: ev.end_date,
         next_checkin_at: nc,
+        stay_nights: nights,
         horaire_prevu: logement.default_horaire_debut ?? null,
         horaire_fin_prevu: logement.default_horaire_fin ?? null,
         duree_estimee_min: defaultDuration,
