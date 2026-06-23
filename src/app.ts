@@ -13,7 +13,12 @@ import apiKey from './plugins/api-key';
 import jwtPlugin from './plugins/jwt';
 import uploadPlugin from './plugins/upload';
 import websocketPlugin from './plugins/websocket';
-import { renderInvitePage, renderResetPasswordPage } from './lib/web-pages';
+import {
+  renderInvitePage,
+  renderResetPasswordPage,
+  renderPrivacyPage,
+  renderSupportPage,
+} from './lib/web-pages';
 
 interface AppOptions extends FastifyServerOptions {
   logLevel?: string;
@@ -90,6 +95,14 @@ function buildApp(opts: AppOptions = {}) {
   app.get('/reset-password/:token', async (request, reply) => {
     const { token } = request.params as { token: string };
     reply.type('text/html').send(renderResetPasswordPage(token));
+  });
+
+  // Pages legales publiques (referencees dans la fiche App Store)
+  app.get('/privacy', async (_request, reply) => {
+    reply.type('text/html').send(renderPrivacyPage());
+  });
+  app.get('/support', async (_request, reply) => {
+    reply.type('text/html').send(renderSupportPage());
   });
 
   return app;

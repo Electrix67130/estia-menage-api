@@ -812,6 +812,17 @@ Pages HTML publiques (pas d'API key) servant de relais depuis les emails : elles
 
 ---
 
+## Pages légales publiques
+
+Pages HTML publiques (pas d'API key), référencées dans la fiche App Store / Play Store.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/privacy` | Politique de confidentialité (RGPD) — responsable de traitement EC CONCIERGERIE. |
+| GET | `/support` | Page de support / contact. |
+
+---
+
 ## Facturation (admin only, org-scoped)
 
 Factures + devis regroupant des ménages d'un client (1 ligne/ménage, prix HT/TVA déjà sur le ménage). Génération par **ménages explicites** ou **client + période** (semaine/mois). Numérotation séquentielle légale (sans trou), attribuée à la finalisation. PDF via pdfkit. Anti double-facturation : un ménage déjà sur une facture non annulée est ignoré.

@@ -2,7 +2,7 @@ import fp from 'fastify-plugin';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import env from '@/config/env';
 
-const PUBLIC_ROUTES = ['/health'];
+const PUBLIC_ROUTES = ['/health', '/privacy', '/support'];
 const PUBLIC_PREFIXES = [
   '/files/',
   '/calendar/ical/',

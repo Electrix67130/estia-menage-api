@@ -74,3 +74,112 @@ export function renderResetPasswordPage(token: string): string {
     buttonLabel: 'Choisir un nouveau mot de passe',
   });
 }
+
+const CONTACT_EMAIL = 'contact@estiaconciergerie.fr';
+const CONTROLLER = 'EC CONCIERGERIE';
+const LAST_UPDATED = '23 juin 2026';
+
+/**
+ * Page legale autonome (politique de confidentialite, support). Reutilise
+ * l'identite visuelle Estia mais avec une mise en page "document" (texte long,
+ * aligne a gauche) plutot que la carte centree des pages-pont.
+ */
+function legalShell(opts: { title: string; heading: string; bodyHtml: string }): string {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${opts.title}</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F7FAFC; color: #0F172A; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 40px 24px 64px; }
+    .head { text-align: center; margin-bottom: 32px; }
+    img.logo { height: 72px; width: auto; margin-bottom: 16px; }
+    .card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 32px 28px; }
+    h1 { font-size: 26px; margin: 0 0 4px; }
+    h2 { font-size: 18px; margin: 28px 0 8px; color: ${BRAND}; }
+    p, li { color: #334155; line-height: 1.65; font-size: 15px; }
+    ul { padding-left: 22px; }
+    a { color: ${BRAND}; }
+    .updated { color: #94A3B8; font-size: 13px; margin: 0 0 8px; }
+    .muted { color: #94A3B8; font-size: 13px; text-align: center; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <img class="logo" src="${logoUrl()}" alt="Estia Clean Connect">
+    </div>
+    <div class="card">
+      <h1>${opts.heading}</h1>
+      <p class="updated">Derniere mise a jour : ${LAST_UPDATED}</p>
+      ${opts.bodyHtml}
+    </div>
+    <p class="muted">Estia Clean Connect — ${CONTROLLER}</p>
+  </div>
+</body>
+</html>`;
+}
+
+export function renderPrivacyPage(): string {
+  return legalShell({
+    title: 'Politique de confidentialite — Estia Clean Connect',
+    heading: 'Politique de confidentialite',
+    bodyHtml: `
+      <p>La presente politique decrit comment <strong>${CONTROLLER}</strong> (le « responsable de traitement ») collecte et traite vos donnees personnelles dans le cadre de l'application <strong>Estia Clean Connect</strong>, conformement au Reglement General sur la Protection des Donnees (RGPD).</p>
+
+      <h2>1. Donnees que nous collectons</h2>
+      <ul>
+        <li><strong>Donnees de compte</strong> : adresse email, prenom, nom, numero de telephone, photo de profil, nom de societe, et pour les prestataires : numero SIRET, numero de TVA et adresse de facturation. Votre mot de passe est stocke uniquement sous forme chiffree (hache).</li>
+        <li><strong>Photos de prestation</strong> : photos prises ou importees lors des menages, horodatees et associees a leur position geographique (latitude/longitude) afin d'attester la realisation de la prestation.</li>
+        <li><strong>Donnees des logements</strong> : adresses et coordonnees GPS des biens a entretenir, saisies par votre organisation.</li>
+        <li><strong>Donnees techniques</strong> : jeton de notification push et type d'appareil (iOS/Android), pour vous envoyer des notifications liees a vos prestations.</li>
+      </ul>
+      <p>Nous n'utilisons <strong>aucun</strong> outil de publicite ni de pistage tiers.</p>
+
+      <h2>2. Pourquoi nous utilisons ces donnees</h2>
+      <ul>
+        <li>Creer et gerer votre compte et vos droits d'acces.</li>
+        <li>Organiser, planifier et attester les prestations de menage.</li>
+        <li>Vous envoyer des notifications operationnelles (prestation disponible, assignee, modifiee, rappels).</li>
+        <li>Gerer la facturation des prestations.</li>
+      </ul>
+      <p>La base legale est l'execution du contrat de service et notre interet legitime a assurer le bon fonctionnement du service.</p>
+
+      <h2>3. Acces a la camera, aux photos et a la localisation</h2>
+      <p>L'application demande l'acces a la camera et a la photothèque pour ajouter des photos aux prestations, et a votre position pour localiser les logements et geolocaliser les photos. Ces autorisations ne sont utilisees que pour ces finalites et peuvent etre revoquees a tout moment dans les reglages de votre appareil.</p>
+
+      <h2>4. Partage des donnees</h2>
+      <p>Vos donnees sont accessibles aux membres autorises de votre organisation selon leurs droits. Nous faisons appel a des sous-traitants techniques pour l'hebergement et l'envoi des notifications (service de notifications push Expo). Nous ne vendons jamais vos donnees.</p>
+
+      <h2>5. Conservation</h2>
+      <p>Vos donnees sont conservees pendant la duree de votre utilisation du service, puis archivees ou supprimees conformement a nos obligations legales (notamment comptables pour les donnees de facturation).</p>
+
+      <h2>6. Vos droits</h2>
+      <p>Vous disposez d'un droit d'acces, de rectification, d'effacement, de limitation et de portabilite de vos donnees, ainsi que du droit de retirer votre consentement. Pour exercer ces droits, contactez-nous a <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Vous pouvez egalement introduire une reclamation aupres de la CNIL.</p>
+
+      <h2>7. Suppression de votre compte</h2>
+      <p>Vous pouvez demander la suppression de votre compte et des donnees associees a tout moment en ecrivant a <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
+
+      <h2>8. Contact</h2>
+      <p>${CONTROLLER} — <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p>
+    `,
+  });
+}
+
+export function renderSupportPage(): string {
+  return legalShell({
+    title: 'Support — Estia Clean Connect',
+    heading: 'Support & assistance',
+    bodyHtml: `
+      <p>Besoin d'aide avec l'application <strong>Estia Clean Connect</strong> ? Notre equipe est la pour vous accompagner.</p>
+      <h2>Nous contacter</h2>
+      <p>Pour toute question, signalement de bug ou demande relative a votre compte, ecrivez-nous a :</p>
+      <p><a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p>
+      <p>Nous nous efforcons de repondre sous 48 heures ouvrees.</p>
+      <h2>Confidentialite</h2>
+      <p>Consultez notre <a href="/privacy">politique de confidentialite</a> pour savoir comment vos donnees sont traitees.</p>
+    `,
+  });
+}
