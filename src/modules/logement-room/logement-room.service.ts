@@ -1,6 +1,25 @@
 import { Knex } from 'knex';
 import BaseService from '@/lib/base-service';
-import { LogementRoomRow, RoomKind } from './logement-room.schema';
+import { CreateLogementRoom, LogementRoomRow, RoomKind } from './logement-room.schema';
+
+/** Libellé singulier par type de pièce, utilisé pour auto-générer le nom (« Salle de bain 1 »). */
+const ROOM_KIND_LABELS: Record<RoomKind, string> = {
+  chambre: 'Chambre',
+  salle_de_bain: 'Salle de bain',
+  wc: 'WC',
+  cuisine: 'Cuisine',
+  salon: 'Salon',
+  salle_a_manger: 'Salle à manger',
+  bureau: 'Bureau',
+  entree: 'Entrée',
+  couloir: 'Couloir',
+  exterieur: 'Extérieur',
+  cave: 'Cave',
+  buanderie: 'Buanderie',
+  piscine: 'Piscine',
+  jacuzzi: 'Jacuzzi',
+  autre: 'Autre',
+};
 
 /**
  * Mapping count → kind/singular pour générer automatiquement les pièces
@@ -62,6 +81,40 @@ class LogementRoomService extends BaseService<LogementRoomRow> {
       .where({ logement_id: logementId })
       .orderBy('position', 'asc')
       .orderBy('name', 'asc');
+  }
+
+  /**
+   * Nom auto-généré pour une pièce typée : « {Label} {N} » où N est le prochain
+   * indice libre parmi les pièces du même type du logement (anti-collision, même
+   * après suppression). Le type « autre » n'est pas auto-nommé (nom libre requis).
+   */
+  async deriveRoomName(logementId: string, kind: RoomKind, excludeId?: string): Promise<string> {
+    const label = ROOM_KIND_LABELS[kind];
+    const existing = (await this.db('logement_room')
+      .where({ logement_id: logementId, kind })
+      .modify((q) => {
+        if (excludeId) q.andWhereNot('id', excludeId);
+      })) as LogementRoomRow[];
+    const taken = new Set(existing.map((r) => r.name));
+    let n = existing.length + 1;
+    while (taken.has(`${label} ${n}`)) n++;
+    return `${label} ${n}`;
+  }
+
+  /**
+   * Crée une pièce en dérivant son nom depuis le type (sauf « autre »).
+   */
+  async createForLogement(data: CreateLogementRoom): Promise<LogementRoomRow> {
+    // Type fourni (hors « autre ») → nom auto-généré. Sinon (ancien client sans
+    // type, ou type « autre ») → nom libre fourni (garanti par le schéma).
+    const name =
+      data.kind !== undefined && data.kind !== 'autre'
+        ? await this.deriveRoomName(data.logement_id, data.kind)
+        : (data.name as string).trim();
+    const [row] = (await this.db('logement_room')
+      .insert({ ...data, name })
+      .returning('*')) as LogementRoomRow[];
+    return row;
   }
 
   /**

@@ -6,6 +6,7 @@ import {
   createLogementConsommableSchema,
   updateLogementConsommableSchema,
   setReleveSchema,
+  setStockSchema,
 } from './logement-consommable.schema';
 import { getActiveMembership } from '@/lib/active-membership';
 import { notifyConsumablesLow } from '@/lib/push';
@@ -68,6 +69,23 @@ export default fp(
       const ok = await assertLogementBelongsToOrg(fastify.db, existing.logement_id, membership.organization_id);
       if (!ok) return reply.notFound('Consommable not found');
       return service.update(id, data);
+    });
+
+    // PUT /logement-consommables/:id/stock — admin : fixe/initialise le stock courant
+    fastify.put('/logement-consommables/:id/stock', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+      const { id } = uuidSchema.parse(request.params);
+      const { qty } = setStockSchema.parse(request.body);
+      const existing = await service.findById(id);
+      if (!existing) return reply.notFound('Consommable not found');
+      const membership = await getActiveMembership(fastify.db, request.user.sub);
+      if (membership?.role !== 'admin') {
+        return reply.code(403).send({ statusCode: 403, error: 'Forbidden', message: 'Admin only' });
+      }
+      const ok = await assertLogementBelongsToOrg(fastify.db, existing.logement_id, membership.organization_id);
+      if (!ok) return reply.notFound('Consommable not found');
+      await service.setStock(id, qty, request.user.sub);
+      const list = await service.findByLogementWithStock(existing.logement_id);
+      return { data: list.find((c) => c.logement_consommable_id === id) ?? null };
     });
 
     // DELETE /logement-consommables/:id — admin (soft-delete)

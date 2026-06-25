@@ -27,9 +27,15 @@ export const setReleveSchema = z.object({
     .min(1),
 });
 
+// Réglage direct du stock courant par un admin (relevé manuel, hors ménage).
+export const setStockSchema = z.object({
+  qty: z.number().int().min(0),
+});
+
 export type CreateLogementConsommable = z.infer<typeof createLogementConsommableSchema>;
 export type UpdateLogementConsommable = z.infer<typeof updateLogementConsommableSchema>;
 export type SetReleve = z.infer<typeof setReleveSchema>;
+export type SetStock = z.infer<typeof setStockSchema>;
 
 export type LogementConsommableRow = {
   id: string;

@@ -61,6 +61,24 @@ class LogementConsommableService extends BaseService<LogementConsommableRow> {
     }));
   }
 
+  /**
+   * Fixe/initialise le stock courant d'un consommable par un admin, via un
+   * relevé « manuel » non rattaché à un ménage (`menage_id = NULL`). Comme le
+   * stock courant = le relevé le plus récent (tous relevés confondus), ce relevé
+   * devient le stock affiché. N'affecte pas les relevés par ménage
+   * (`getMenageConsommables` filtre sur `menage_id`).
+   */
+  async setStock(logementConsommableId: string, qty: number, userId: string): Promise<void> {
+    await this.db('menage_consommable_releve').insert({
+      menage_id: null,
+      logement_consommable_id: logementConsommableId,
+      qty,
+      recorded_by: userId,
+      recorded_at: this.db.fn.now(),
+      updated_at: this.db.fn.now(),
+    });
+  }
+
   /** Soft-delete via archived_at (préserve l'historique des relevés). */
   async archive(id: string): Promise<void> {
     await this.db('logement_consommable')

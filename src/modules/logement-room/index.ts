@@ -63,7 +63,7 @@ export default fp(
       }
       const ok = await assertLogementBelongsToOrg(fastify.db, data.logement_id, membership.organization_id);
       if (!ok) return reply.notFound('Logement not found');
-      const row = await service.create(data);
+      const row = await service.createForLogement(data);
       return reply.code(201).send(signFields(row, ['photo_url']));
     });
 
@@ -79,7 +79,12 @@ export default fp(
       }
       const ok = await assertLogementBelongsToOrg(fastify.db, existing.logement_id, membership.organization_id);
       if (!ok) return reply.notFound('Room not found');
-      const updated = await service.update(id, data);
+      // Si le type change vers un type non-« autre » sans nom explicite, on redérive le nom.
+      const patch =
+        data.kind && data.kind !== 'autre' && data.name === undefined
+          ? { ...data, name: await service.deriveRoomName(existing.logement_id, data.kind, id) }
+          : data;
+      const updated = await service.update(id, patch);
       return updated ? signFields(updated, ['photo_url']) : updated;
     });
 

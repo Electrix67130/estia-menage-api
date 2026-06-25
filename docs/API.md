@@ -209,12 +209,16 @@ Pièces du logement, **100% personnalisables** : nom libre + photo de couverture
 ```json
 {
   "logement_id": "uuid",
-  "name": "Suite parentale du fond",
+  "kind": "salle_de_bain",
   "photo_url": "https://api.estia-clean-connect.fr/files/<uuid>.jpg",
   "position": 0,
   "notes": "Lit king size"
 }
 ```
+
+- `kind` — type de pièce (envoyé par l'UI récente). Quand il est fourni et ≠ `autre`, le `name` est **auto-généré** depuis le type (« Salle de bain 1 », « Salle de bain 2 »… indice anti-collision). Optionnel pour rétro-compat (anciens clients mobiles qui n'envoient que `name`).
+- `name` — requis si **pas de `kind`** ou si `kind: "autre"` (nom libre). Ignoré quand un `kind` non-`autre` est fourni.
+- `PATCH` : changer le `kind` vers un type non-`autre` (sans `name`) redérive le nom.
 
 `name` est libre. `photo_url` (optionnel) est signé à la lecture. `kind` est conservé en legacy (optionnel) mais n'est plus imposé ni utilisé par l'UI.
 
@@ -735,7 +739,8 @@ Liste de consommables par logement (config admin) + relevé de quantité restant
 |---|---|---|
 | GET | `/logement-consommables?logement_id=` | Liste active + **stock courant** (dernier relevé) + `needs_restock` par item |
 | POST | `/logement-consommables` | Crée un consommable (admin) — body `{ logement_id, label, unit?, seuil_alerte?, position? }` |
-| PATCH | `/logement-consommables/:id` | Modifie (admin) |
+| PATCH | `/logement-consommables/:id` | Modifie la config (admin) — `label/unit/seuil_alerte/position` |
+| PUT | `/logement-consommables/:id/stock` | **Fixe/initialise le stock courant** (admin) — body `{ qty }`. Crée un relevé manuel (`menage_id` NULL) qui devient le stock courant. Ne déclenche pas la notif de seuil. |
 | DELETE | `/logement-consommables/:id` | Soft-delete via `archived_at` (admin) — préserve l'historique |
 | GET | `/menages/:id/consommables` | Liste du logement + quantité relevée pour CE ménage (`qty` null si non saisi) |
 | PUT | `/menages/:id/consommables` | Relevé au pointage de fin — body `{ items: [{ logement_consommable_id, qty }] }` (prestataire assigné ou admin) |

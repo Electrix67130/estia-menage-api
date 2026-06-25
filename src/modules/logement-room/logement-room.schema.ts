@@ -20,15 +20,23 @@ export const roomKindEnum = z.enum([
 
 export type RoomKind = z.infer<typeof roomKindEnum>;
 
-export const createLogementRoomSchema = z.object({
-  logement_id: z.string().uuid(),
-  name: z.string().min(1).max(200),
-  // `kind` conservé pour rétro-compat, plus imposé : pièces 100% libres (nom + photo).
-  kind: roomKindEnum.optional(),
-  photo_url: z.string().url().max(500).nullable().optional(),
-  position: z.number().int().min(0).optional(),
-  notes: z.string().max(2000).optional(),
-});
+export const createLogementRoomSchema = z
+  .object({
+    logement_id: z.string().uuid(),
+    // Le type pilote l'identification de la pièce (UI récente). Optionnel pour
+    // rétro-compat : un ancien client mobile envoie seulement `name`.
+    kind: roomKindEnum.optional(),
+    // Nom auto-généré côté serveur depuis le type (« Salle de bain 1 ») quand un
+    // `kind` non-« autre » est fourni ; requis sinon (type « autre » ou pas de type).
+    name: z.string().min(1).max(200).optional(),
+    photo_url: z.string().url().max(500).nullable().optional(),
+    position: z.number().int().min(0).optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .refine(
+    (d) => (d.kind !== undefined && d.kind !== 'autre') || (typeof d.name === 'string' && d.name.trim().length > 0),
+    { message: 'Un nom est requis (sauf si un type autre que « autre » est fourni)', path: ['name'] },
+  );
 
 export const updateLogementRoomSchema = z.object({
   name: z.string().min(1).max(200).optional(),
