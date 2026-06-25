@@ -13,6 +13,7 @@ import {
   updateItemSchema,
   reorderItemsSchema,
   toggleItemSchema,
+  toggleAllSchema,
 } from './menage-check.schema';
 import {
   requirePermissionForMenage,
@@ -198,6 +199,56 @@ export default fp(
           actor_id: request.user.sub,
         }).catch((err) => fastify.log.error({ err }, 'WS emit failed'));
         return updated;
+      },
+    );
+
+    // POST /menage-check-sections/:id/toggle-all — coche/décoche toute la section
+    fastify.post(
+      '/menage-check-sections/:id/toggle-all',
+      { preHandler: [fastify.authenticate] },
+      async (request, reply) => {
+        const { id } = uuidSchema.parse(request.params);
+        const { validated } = toggleAllSchema.parse(request.body);
+        const section = await sectionService.findById(id);
+        if (!section) return reply.notFound('Section not found');
+        const menage = await fastify.db('menage').where({ id: section.menage_id }).first();
+        if (!menage) return reply.notFound('Menage not found');
+        const isPrestataire = menage.prestataire_user_id === request.user.sub;
+        if (!isPrestataire) {
+          await requirePermissionForMenage(fastify.db, request.user.sub, section.menage_id, 'edit');
+        }
+        await itemService.toggleBySection(id, validated, request.user.sub);
+        emitToMenage(fastify.db, section.menage_id, {
+          type: 'menage-check-item.toggled',
+          menage_id: section.menage_id,
+          resource_id: id,
+          actor_id: request.user.sub,
+        }).catch((err) => fastify.log.error({ err }, 'WS emit failed'));
+        return findChecklistTree(fastify.db, section.menage_id);
+      },
+    );
+
+    // POST /menages/:menage_id/check/toggle-all — coche/décoche toute la checklist
+    fastify.post(
+      '/menages/:menage_id/check/toggle-all',
+      { preHandler: [fastify.authenticate] },
+      async (request, reply) => {
+        const { menage_id } = z.object({ menage_id: z.string().uuid() }).parse(request.params);
+        const { validated } = toggleAllSchema.parse(request.body);
+        const menage = await fastify.db('menage').where({ id: menage_id }).first();
+        if (!menage) return reply.notFound('Menage not found');
+        const isPrestataire = menage.prestataire_user_id === request.user.sub;
+        if (!isPrestataire) {
+          await requirePermissionForMenage(fastify.db, request.user.sub, menage_id, 'edit');
+        }
+        await itemService.toggleByMenage(menage_id, validated, request.user.sub);
+        emitToMenage(fastify.db, menage_id, {
+          type: 'menage-check-item.toggled',
+          menage_id,
+          resource_id: menage_id,
+          actor_id: request.user.sub,
+        }).catch((err) => fastify.log.error({ err }, 'WS emit failed'));
+        return findChecklistTree(fastify.db, menage_id);
       },
     );
 

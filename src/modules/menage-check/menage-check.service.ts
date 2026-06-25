@@ -58,6 +58,34 @@ export class MenageCheckItemService extends BaseService<MenageCheckItemRow> {
       .returning('*')) as MenageCheckItemRow[];
     return row;
   }
+
+  /** Coche/décoche tous les items d'une section d'un coup. Retourne le nb d'items affectés. */
+  async toggleBySection(sectionId: string, validated: boolean, userId: string): Promise<number> {
+    const now = new Date();
+    return this.db('menage_check_item')
+      .where({ section_id: sectionId })
+      .update({
+        validated_at: validated ? now : null,
+        validated_by: validated ? userId : null,
+        updated_at: now,
+      });
+  }
+
+  /** Coche/décoche tous les items de toutes les sections d'un ménage. */
+  async toggleByMenage(menageId: string, validated: boolean, userId: string): Promise<number> {
+    const now = new Date();
+    const sectionIds = (await this.db('menage_check_section')
+      .where({ menage_id: menageId })
+      .pluck('id')) as string[];
+    if (sectionIds.length === 0) return 0;
+    return this.db('menage_check_item')
+      .whereIn('section_id', sectionIds)
+      .update({
+        validated_at: validated ? now : null,
+        validated_by: validated ? userId : null,
+        updated_at: now,
+      });
+  }
 }
 
 /**

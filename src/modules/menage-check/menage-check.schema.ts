@@ -52,6 +52,11 @@ export const toggleItemSchema = z.object({
   comment: z.string().max(5000).optional(),
 });
 
+// Cocher/décocher en masse (toute une section ou tout le ménage).
+export const toggleAllSchema = z.object({
+  validated: z.boolean(),
+});
+
 export type CreateSection = z.infer<typeof createSectionSchema>;
 export type UpdateSection = z.infer<typeof updateSectionSchema>;
 export type CreateItem = z.infer<typeof createItemSchema>;

@@ -462,6 +462,8 @@ Sections (= pièces) et items générés automatiquement à la création du mén
 | PATCH | `/menage-check-sections/:id` | Renomme section |
 | DELETE | `/menage-check-sections/:id` | Supprime section |
 | POST | `/menages/:menage_id/check/sections/reorder` | Body `{ ordered_ids: [...] }` |
+| POST | `/menages/:menage_id/check/toggle-all` | Coche/décoche **toute** la checklist — body `{ validated }` (presta assigné ou edit) → renvoie l'arbre |
+| POST | `/menage-check-sections/:id/toggle-all` | Coche/décoche **toute la section** — body `{ validated }` (presta assigné ou edit) → renvoie l'arbre |
 | POST | `/menage-check-items` | Ajout item |
 | PATCH | `/menage-check-items/:id` | Modifie item (label, comment) |
 | DELETE | `/menage-check-items/:id` | Supprime item |
