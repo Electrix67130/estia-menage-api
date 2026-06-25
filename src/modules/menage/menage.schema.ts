@@ -67,6 +67,28 @@ export const pointageSchema = z.object({
   lng: z.number().min(-180).max(180),
 });
 
+/**
+ * Pointage d'arrivée enrichi : note des voyageurs + déclaration de dégradation.
+ * Champs nouveaux tous OPTIONNELS (rétro-compat : l'app mobile actuelle n'envoie
+ * que photo_url/lat/lng). L'obligation est imposée par la nouvelle UI mobile.
+ */
+export const arrivalSchema = pointageSchema.extend({
+  traveler_rating: z.number().int().min(1).max(5).optional(),
+  has_degradation: z.boolean().optional(),
+  degradation_note: z.string().max(5000).optional(),
+  degradation_photos: z
+    .array(
+      z.object({
+        url: z.string().url().max(1000),
+        thumbnail_url: z.string().url().max(1000).optional(),
+        file_size: z.coerce.number().int().positive().optional(),
+        mime_type: z.string().max(100).optional(),
+      }),
+    )
+    .max(20)
+    .optional(),
+});
+
 export const listMenagesSchema = z.object({
   status: menageStatusEnum.optional(),
   prestataire_user_id: z.string().uuid().optional(),
@@ -98,6 +120,7 @@ export type CreateMenage = z.infer<typeof createMenageSchema>;
 export type UpdateMenage = z.infer<typeof updateMenageSchema>;
 export type ValidateReport = z.infer<typeof validateReportSchema>;
 export type Pointage = z.infer<typeof pointageSchema>;
+export type Arrival = z.infer<typeof arrivalSchema>;
 export type ListMenagesQuery = z.infer<typeof listMenagesSchema>;
 
 export type MenageRow = {
@@ -127,6 +150,9 @@ export type MenageRow = {
   departure_photo_url: string | null;
   departure_lat: number | string | null;
   departure_lng: number | string | null;
+  traveler_rating: number | null;
+  has_degradation: boolean;
+  degradation_note: string | null;
   prix_prevu: number | string | null;
   client_price_ht: number | string | null;
   client_vat_rate: number | string | null;

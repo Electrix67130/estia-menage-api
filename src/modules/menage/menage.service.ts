@@ -168,20 +168,51 @@ class MenageService extends BaseService<MenageRow> {
   async recordArrival(
     id: string,
     proof: { photoUrl: string; lat: number; lng: number },
+    arrival?: {
+      userId: string;
+      travelerRating?: number;
+      hasDegradation?: boolean;
+      degradationNote?: string;
+      degradationPhotos?: {
+        url: string;
+        thumbnail_url?: string;
+        file_size?: number;
+        mime_type?: string;
+      }[];
+    },
   ): Promise<MenageRow | undefined> {
     const now = new Date();
-    const [row] = (await this.db('menage')
-      .where({ id })
-      .update({
+    return this.db.transaction(async (trx) => {
+      const update: Record<string, unknown> = {
         arrived_at: now,
         status: 'en_cours',
         arrival_photo_url: proof.photoUrl,
         arrival_lat: proof.lat,
         arrival_lng: proof.lng,
         updated_at: now,
-      })
-      .returning('*')) as MenageRow[];
-    return row;
+      };
+      if (arrival?.travelerRating !== undefined) update.traveler_rating = arrival.travelerRating;
+      if (arrival?.hasDegradation !== undefined) update.has_degradation = arrival.hasDegradation;
+      if (arrival?.degradationNote !== undefined) update.degradation_note = arrival.degradationNote;
+      const [row] = (await trx('menage').where({ id }).update(update).returning('*')) as MenageRow[];
+
+      // Photos de dégradation → table photo, taguées is_degradation.
+      if (arrival?.hasDegradation && arrival.degradationPhotos?.length && arrival.userId) {
+        await trx('photo').insert(
+          arrival.degradationPhotos.map((p) => ({
+            menage_id: id,
+            uploaded_by: arrival.userId,
+            url: p.url,
+            thumbnail_url: p.thumbnail_url ?? null,
+            mime_type: p.mime_type ?? null,
+            file_size: p.file_size ?? null,
+            taken_at: now,
+            is_degradation: true,
+          })),
+        );
+      }
+      return row;
+    });
   }
 
   async recordDeparture(

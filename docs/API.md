@@ -278,7 +278,7 @@ Chaque ménage sérialisé (liste **et** détail) inclut un booléen calculé **
 | POST | `/menages` | Création (admin) — **génère auto la checklist** |
 | PATCH | `/menages/:id` | Mise à jour (manager/admin via can_edit) — accepte `prestataire_user_id` pour affecter/désaffecter. Si on modifie `date_prevue` sur un ménage rattaché à un calendrier externe, `date_locked` est posé à `true` automatiquement (sauf si le payload contient une valeur explicite de `date_locked`, par ex. `date_locked: false` pour rouvrir le ménage à la sync iCal). |
 | DELETE | `/menages/:id` | Suppression (admin) |
-| POST | `/menages/:id/arrival` | Pointage arrivée (prestataire assigné) — body `{ photo_url, lat, lng }` (photo géolocalisée obligatoire) |
+| POST | `/menages/:id/arrival` | Pointage arrivée (prestataire assigné) — body `{ photo_url, lat, lng, traveler_rating?, has_degradation?, degradation_note?, degradation_photos? }`. Photo géolocalisée obligatoire. `traveler_rating` 1-5. Si `has_degradation`, `degradation_photos: [{ url, thumbnail_url?, file_size?, mime_type? }]` est enregistré dans `photo` avec `is_degradation=true`. Nouveaux champs optionnels (rétro-compat). |
 | POST | `/menages/:id/departure` | Pointage départ (prestataire assigné) — body `{ photo_url, lat, lng }` |
 | POST | `/menages/:id/validate` | Validation rapport — body `{ price?: number }` |
 | GET | `/me/earnings?from=&to=&validated_only=` | Bilan gains du prestataire connecté. Inclut les ménages où il est référent **ou** affecté via `menage_prestataire` (multi-affectation, remplacement ponctuel). |

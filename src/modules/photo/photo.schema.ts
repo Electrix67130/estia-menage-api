@@ -14,6 +14,7 @@ export const createPhotoSchema = z
     taken_at: z.string(),
     file_size: z.coerce.number().int().positive().optional(),
     mime_type: z.string().max(50).optional(),
+    is_degradation: z.boolean().optional(),
   })
   .refine((data) => Boolean(data.menage_id) || Boolean(data.logement_id), {
     message: 'Une photo doit être rattachée à un ménage ou à un logement',
@@ -36,6 +37,7 @@ export type PhotoRow = {
   taken_at: string;
   file_size: number | null;
   mime_type: string | null;
+  is_degradation: boolean;
   created_at: string;
   updated_at: string;
 };

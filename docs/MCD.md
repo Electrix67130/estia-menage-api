@@ -126,6 +126,9 @@ Prestation de ménage datée.
 | arrival_lat / arrival_lng | decimal(10,7) | coordonnées GPS au moment de la photo d'arrivée |
 | departure_photo_url | varchar(500) | photo géolocalisée prise au départ |
 | departure_lat / departure_lng | decimal(10,7) | coordonnées GPS au moment de la photo de départ |
+| traveler_rating | int | note des voyageurs (1-5) saisie à l'arrivée |
+| has_degradation | boolean default false | dégradation déclarée à l'arrivée |
+| degradation_note | text | description de la dégradation |
 | prix_prevu | decimal(10,2) | |
 | validated_at | timestamp | validation rapport par manager |
 | validated_by | uuid FK user SET NULL | |
@@ -203,6 +206,7 @@ INDEX : `(section_id, position)`.
 | **taken_at** | timestamp notnull | horodatage obligatoire |
 | file_size | int | |
 | mime_type | varchar(100) | |
+| is_degradation | boolean default false | photo de dégradation déclarée à l'arrivée |
 | created_at, updated_at | timestamp | |
 
 INDEX : `(menage_id, taken_at)`, `(section_id)`.

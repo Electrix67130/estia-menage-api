@@ -7,6 +7,7 @@ import {
   updateMenageSchema,
   validateReportSchema,
   pointageSchema,
+  arrivalSchema,
   listMenagesSchema,
   serializeMenageForRole,
 } from './menage.schema';
@@ -361,7 +362,8 @@ export default fp(
       { preHandler: [fastify.authenticate] },
       async (request, reply) => {
         const { id } = uuidSchema.parse(request.params);
-        const { photo_url, lat, lng } = pointageSchema.parse(request.body);
+        const { photo_url, lat, lng, traveler_rating, has_degradation, degradation_note, degradation_photos } =
+          arrivalSchema.parse(request.body);
         const existing = await service.findById(id);
         if (!existing) return reply.notFound('Menage not found');
         if (existing.prestataire_user_id !== request.user.sub) {
@@ -371,7 +373,17 @@ export default fp(
             message: 'Seul le prestataire assigné peut pointer son arrivée',
           });
         }
-        const updated = await service.recordArrival(id, { photoUrl: photo_url, lat, lng });
+        const updated = await service.recordArrival(
+          id,
+          { photoUrl: photo_url, lat, lng },
+          {
+            userId: request.user.sub,
+            travelerRating: traveler_rating,
+            hasDegradation: has_degradation,
+            degradationNote: degradation_note,
+            degradationPhotos: degradation_photos,
+          },
+        );
         emitToMenage(fastify.db, id, {
           type: 'menage.arrival',
           menage_id: id,
