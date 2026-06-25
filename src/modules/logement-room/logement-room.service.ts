@@ -23,6 +23,8 @@ export interface RoomCountSnapshot {
   n_exterior_spaces: number;
   has_basement: boolean;
   has_laundry: boolean;
+  has_pool: boolean;
+  has_jacuzzi: boolean;
 }
 
 const COUNT_FIELDS: Array<{
@@ -41,11 +43,13 @@ const COUNT_FIELDS: Array<{
 ];
 
 const FLAG_ROOMS: Array<{
-  field: keyof Pick<RoomCountSnapshot, 'has_basement' | 'has_laundry'>;
+  field: keyof Pick<RoomCountSnapshot, 'has_basement' | 'has_laundry' | 'has_pool' | 'has_jacuzzi'>;
   def: RoomDefaultDef;
 }> = [
   { field: 'has_basement', def: { kind: 'cave', singular: 'Cave' } },
   { field: 'has_laundry', def: { kind: 'buanderie', singular: 'Buanderie' } },
+  { field: 'has_pool', def: { kind: 'piscine', singular: 'Piscine' } },
+  { field: 'has_jacuzzi', def: { kind: 'jacuzzi', singular: 'Jacuzzi' } },
 ];
 
 class LogementRoomService extends BaseService<LogementRoomRow> {

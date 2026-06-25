@@ -13,6 +13,8 @@ export const roomKindEnum = z.enum([
   'exterieur',
   'cave',
   'buanderie',
+  'piscine',
+  'jacuzzi',
   'autre',
 ]);
 

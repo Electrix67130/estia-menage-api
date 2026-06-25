@@ -19,6 +19,8 @@ export const createLogementSchema = z.object({
   n_exterior_spaces: z.number().int().min(0).max(10).default(0),
   has_basement: z.boolean().default(false),
   has_laundry: z.boolean().default(false),
+  has_pool: z.boolean().default(false),
+  has_jacuzzi: z.boolean().default(false),
   surface_m2: z.number().int().min(0).max(10000).optional(),
   notes: z.string().max(5000).optional(),
   proprietaire_user_id: z.string().uuid().optional(),
@@ -60,6 +62,8 @@ export const updateLogementSchema = z.object({
   n_exterior_spaces: z.number().int().min(0).max(10).optional(),
   has_basement: z.boolean().optional(),
   has_laundry: z.boolean().optional(),
+  has_pool: z.boolean().optional(),
+  has_jacuzzi: z.boolean().optional(),
   surface_m2: z.number().int().min(0).max(10000).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
   proprietaire_user_id: z.string().uuid().nullable().optional(),
@@ -105,6 +109,8 @@ export type LogementRow = {
   n_exterior_spaces: number;
   has_basement: boolean;
   has_laundry: boolean;
+  has_pool: boolean;
+  has_jacuzzi: boolean;
   surface_m2: number | null;
   notes: string | null;
   key_safe_code: string | null;

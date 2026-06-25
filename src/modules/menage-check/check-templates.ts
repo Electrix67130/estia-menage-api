@@ -48,6 +48,20 @@ export const DEFAULT_CHECK_ITEMS_BY_TYPE: Record<SectionType, string[]> = {
   ],
   basement: ['Vérifier propreté', 'Aspirer si nécessaire'],
   laundry: ['Vider sèche-linge', 'Lancer linge sale en machine'],
+  pool: [
+    'Nettoyer la ligne d\'eau',
+    'Passer le robot / l\'épuisette',
+    'Nettoyer skimmers et filtre',
+    'Vérifier le niveau et le traitement de l\'eau',
+    'Ranger le mobilier et nettoyer les abords',
+  ],
+  jacuzzi: [
+    'Vider et rincer la cuve si nécessaire',
+    'Nettoyer la cuve et la ligne d\'eau',
+    'Nettoyer les filtres',
+    'Vérifier le niveau et le traitement de l\'eau',
+    'Replacer la couverture',
+  ],
   general: [
     'Vérifier état général du logement',
     'Remettre les clés à leur place',
@@ -69,6 +83,8 @@ interface LogementParams {
   n_exterior_spaces: number;
   has_basement: boolean;
   has_laundry: boolean;
+  has_pool: boolean;
+  has_jacuzzi: boolean;
 }
 
 const SINGLE_SECTION_LABELS: Record<SectionType, string> = {
@@ -80,6 +96,8 @@ const SINGLE_SECTION_LABELS: Record<SectionType, string> = {
   exterior: 'Espace extérieur',
   basement: 'Cave',
   laundry: 'Buanderie',
+  pool: 'Piscine',
+  jacuzzi: 'Jacuzzi',
   general: 'Tâches générales',
 };
 
@@ -108,6 +126,8 @@ export function buildSectionPlan(logement: LogementParams): SectionPlan[] {
   addRepeated('exterior', logement.n_exterior_spaces);
   if (logement.has_basement) sections.push({ type: 'basement', label: SINGLE_SECTION_LABELS.basement });
   if (logement.has_laundry) sections.push({ type: 'laundry', label: SINGLE_SECTION_LABELS.laundry });
+  if (logement.has_pool) sections.push({ type: 'pool', label: SINGLE_SECTION_LABELS.pool });
+  if (logement.has_jacuzzi) sections.push({ type: 'jacuzzi', label: SINGLE_SECTION_LABELS.jacuzzi });
   sections.push({ type: 'general', label: SINGLE_SECTION_LABELS.general });
 
   return sections;

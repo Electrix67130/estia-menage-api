@@ -9,6 +9,8 @@ export const sectionTypeEnum = z.enum([
   'exterior',
   'basement',
   'laundry',
+  'pool',
+  'jacuzzi',
   'general',
 ]);
 export type SectionType = z.infer<typeof sectionTypeEnum>;

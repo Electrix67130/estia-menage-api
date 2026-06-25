@@ -151,6 +151,8 @@ Bien locatif paramétrable. Source des paramètres de génération de checklist.
   "n_lit_appoint": 0,
   "has_basement": false,
   "has_laundry": true,
+  "has_pool": false,
+  "has_jacuzzi": false,
   "surface_m2": 35,
   "notes": "Code interphone : 1234B",
   "key_safe_code": "1234",
@@ -186,6 +188,8 @@ Mapping `n_*` → kind :
 | `n_exterior_spaces` | `exterieur` | Extérieur |
 | `has_basement` | `cave` | Cave |
 | `has_laundry` | `buanderie` | Buanderie |
+| `has_pool` | `piscine` | Piscine |
+| `has_jacuzzi` | `jacuzzi` | Jacuzzi |
 
 ---
 
@@ -639,7 +643,7 @@ Une photo peut être rattachée à un **ménage** (avec ou sans `section_id`) OU
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/photos?menage_id=` | Photos du ménage (requiert `view_photos`) |
+| GET | `/photos?menage_id=&section_id=` | Photos du ménage (requiert `view_photos`) — `section_id` filtre par pièce |
 | GET | `/photos?logement_id=&logement_room_id=` | Photos du logement (et filtrage par pièce) |
 | GET | `/photos/:id` | Détail |
 | POST | `/photos` | Upload — body inclut `menage_id` OU `logement_id` |

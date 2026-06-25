@@ -92,6 +92,8 @@ Bien locatif paramétrable.
 | **n_lit_appoint** | int notnull default 0 | nb lits d'appoint — défaut copié sur chaque ménage |
 | has_basement | boolean default false | |
 | has_laundry | boolean default false | |
+| has_pool | boolean default false | piscine → génère une section checklist `pool` |
+| has_jacuzzi | boolean default false | jacuzzi → génère une section checklist `jacuzzi` |
 | surface_m2 | int | |
 | notes | text | |
 | key_safe_code | varchar(50) | code de boîte à clef (saisi par l'admin, visible aux membres du logement) ; UI masque le contenu avec un eye toggle |
@@ -166,7 +168,7 @@ Pièce (section) de la checklist d'un ménage.
 |---|---|---|
 | id | uuid PK | |
 | menage_id | uuid FK menage CASCADE notnull | |
-| section_type | varchar(50) notnull | `kitchen/living_room/bedroom/bathroom/wc/exterior/basement/laundry/general` |
+| section_type | varchar(50) notnull | `kitchen/living_room/bedroom/bathroom/wc/exterior/basement/laundry/pool/jacuzzi/general` |
 | section_label | varchar(200) notnull | "Chambre 1", "Salle de bain 2", … |
 | position | int notnull default 0 | |
 | created_at, updated_at | timestamp | |
