@@ -374,7 +374,8 @@ Filtre `closed` : `closed=true` = uniquement les ménages clôturés (`valide`/`
 - `laundry_*` : option linge (si `laundry_included=true`).
 
 **Composition des lits** :
-- `n_lit_simple` / `n_lit_double` / `n_canape_lit` / `n_lit_appoint` (int 0-50, optionnel) — si non fournis, copiés depuis le logement parent. Modifiables ensuite via `PATCH /menages/:id` (admin uniquement, lecture seule côté prestataire).
+- `n_lit_simple` / `n_lit_double` / `n_canape_lit` / `n_lit_appoint` (int 0-50, optionnel) — **lits à faire** pour ce ménage. Si non fournis, copiés depuis le logement parent. Modifiables ensuite via `PATCH /menages/:id` (admin uniquement, lecture seule côté prestataire).
+- `n_travelers` (int 0-50, optionnel) — **nombre de voyageurs** du séjour (saisi par l'admin ; l'iCal ne le fournit pas de façon fiable). Sert à dimensionner les lits à faire. `stay_nights` (durée du séjour) est, lui, dérivé de l'iCal.
 
 **Access control sur la réponse** :
 - Admin / manager : voient tous les champs.

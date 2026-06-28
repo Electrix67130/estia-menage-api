@@ -137,6 +137,7 @@ Prestation de ménage datée.
 | **n_lit_double** | int notnull default 0 | nb lits doubles sur ce ménage |
 | **n_canape_lit** | int notnull default 0 | nb canapés-lits sur ce ménage |
 | **n_lit_appoint** | int notnull default 0 | nb lits d'appoint sur ce ménage |
+| n_travelers | int | nb de voyageurs (saisi admin ; dimensionne les « lits à faire ») |
 | notes_intervention | text | |
 | archived_at | timestamp | |
 | created_at, updated_at | timestamp | |
