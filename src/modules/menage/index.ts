@@ -226,8 +226,11 @@ export default fp(
       // Édition manuelle de arrived_at/departed_at = admin uniquement (correction
       // a posteriori si le prestataire a oublié de pointer ou s'est trompé).
       const isTimestampEdit = 'arrived_at' in data || 'departed_at' in data;
+      // Changement de statut « à la main » = admin uniquement (correction d'un
+      // statut erroné, ex. repassé en « à venir » un ménage terminé par erreur).
+      const isStatusEdit = 'status' in data && data.status !== undefined && data.status !== existing.status;
 
-      if (isPrestataireChange || isTimestampEdit) {
+      if (isPrestataireChange || isTimestampEdit || isStatusEdit) {
         const membership = await getActiveMembership(fastify.db, request.user.sub);
         if (
           membership?.role !== 'admin' ||
@@ -238,7 +241,9 @@ export default fp(
             error: 'Forbidden',
             message: isTimestampEdit
               ? "Seul un administrateur peut modifier les heures d'arrivée/départ"
-              : 'Seul un administrateur peut affecter un prestataire à un ménage',
+              : isStatusEdit
+                ? 'Seul un administrateur peut modifier le statut d’un ménage'
+                : 'Seul un administrateur peut affecter un prestataire à un ménage',
           });
         }
       } else {
@@ -272,6 +277,16 @@ export default fp(
         existing.external_calendar_id
       ) {
         (dataWithLock as Record<string, unknown>).date_locked = true;
+      }
+      // Cohérence des horodatages lors d'un changement de statut « à la main ».
+      // (Sauf si l'admin a explicitement fourni arrived_at/departed_at.)
+      if (isStatusEdit) {
+        if (data.status === 'a_venir') {
+          if (!('arrived_at' in data)) (dataWithLock as Record<string, unknown>).arrived_at = null;
+          if (!('departed_at' in data)) (dataWithLock as Record<string, unknown>).departed_at = null;
+        } else if (data.status === 'en_cours') {
+          if (!('departed_at' in data)) (dataWithLock as Record<string, unknown>).departed_at = null;
+        }
       }
       const menage = await service.update(id, dataWithLock);
 
