@@ -18,6 +18,7 @@ import {
 import {
   requirePermissionForMenage,
   requirePermissionForLogement,
+  isAssignedToMenage,
 } from '@/lib/permissions';
 import { emitToMenage } from '@/lib/realtime-hub';
 
@@ -37,9 +38,9 @@ export default fp(
         const { menage_id } = menageParam.parse(request.params);
         const menage = await fastify.db('menage').where({ id: menage_id }).first();
         if (!menage) return reply.notFound('Menage not found');
-        // Prestataire assigné OU permission view_checklist sur le logement
-        const isPrestataire = menage.prestataire_user_id === request.user.sub;
-        if (!isPrestataire) {
+        // Affecté au ménage (mono ou multi-affectation) OU permission
+        // view_checklist sur le logement.
+        if (!(await isAssignedToMenage(fastify.db, request.user.sub, menage_id))) {
           await requirePermissionForLogement(
             fastify.db,
             request.user.sub,
@@ -186,9 +187,8 @@ export default fp(
         if (!section) return reply.notFound('Section not found');
         const menage = await fastify.db('menage').where({ id: section.menage_id }).first();
         if (!menage) return reply.notFound('Menage not found');
-        // Prestataire assigné OU edit permission
-        const isPrestataire = menage.prestataire_user_id === request.user.sub;
-        if (!isPrestataire) {
+        // Affecté au ménage (mono ou multi-affectation) OU edit permission
+        if (!(await isAssignedToMenage(fastify.db, request.user.sub, section.menage_id))) {
           await requirePermissionForMenage(fastify.db, request.user.sub, section.menage_id, 'edit');
         }
         const updated = await itemService.toggle(id, data.validated, request.user.sub, data.comment);
@@ -213,8 +213,7 @@ export default fp(
         if (!section) return reply.notFound('Section not found');
         const menage = await fastify.db('menage').where({ id: section.menage_id }).first();
         if (!menage) return reply.notFound('Menage not found');
-        const isPrestataire = menage.prestataire_user_id === request.user.sub;
-        if (!isPrestataire) {
+        if (!(await isAssignedToMenage(fastify.db, request.user.sub, section.menage_id))) {
           await requirePermissionForMenage(fastify.db, request.user.sub, section.menage_id, 'edit');
         }
         await itemService.toggleBySection(id, validated, request.user.sub);

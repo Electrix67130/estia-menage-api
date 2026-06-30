@@ -94,3 +94,38 @@ export async function requirePermissionForMenage(
     throw Object.assign(new Error('Forbidden: insufficient permissions'), { statusCode: 403 });
   }
 }
+
+/**
+ * Un user affecté au ménage a accès à ce ménage, indépendamment des permissions
+ * logement : c'est lui qui fait la prestation (y compris un remplaçant affecté
+ * à ce seul ménage, donc pas membre permanent du logement). L'affectation se
+ * lit dans `menage_prestataire` (multi-affectation) + la colonne legacy
+ * `prestataire_user_id` (référent principal).
+ */
+export async function isAssignedToMenage(
+  db: Knex,
+  userId: string,
+  menageId: string,
+): Promise<boolean> {
+  const assigned = await db('menage_prestataire')
+    .where({ menage_id: menageId, user_id: userId })
+    .first();
+  if (assigned) return true;
+  const menage = await db('menage').where({ id: menageId }).select('prestataire_user_id').first();
+  return !!menage && menage.prestataire_user_id === userId;
+}
+
+/**
+ * Accès à une ressource rattachée à un ménage (photos, commentaires, checklist) :
+ * OK si le user est affecté au ménage, sinon on retombe sur la permission
+ * logement (qui inclut déjà le bypass admin / créateur du logement).
+ */
+export async function requireMenageAccess(
+  db: Knex,
+  userId: string,
+  menageId: string,
+  permission: Permission,
+): Promise<void> {
+  if (await isAssignedToMenage(db, userId, menageId)) return;
+  await requirePermissionForMenage(db, userId, menageId, permission);
+}

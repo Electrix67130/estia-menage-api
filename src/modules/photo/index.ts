@@ -4,7 +4,7 @@ import PhotoService from './photo.service';
 import { createPhotoSchema } from './photo.schema';
 import { signUrlsInList } from '@/lib/sign-url';
 import { emitToMenage } from '@/lib/realtime-hub';
-import { requirePermissionForMenage } from '@/lib/permissions';
+import { requireMenageAccess, requirePermissionForMenage } from '@/lib/permissions';
 import { getActiveMembership } from '@/lib/active-membership';
 
 const listPhotosSchema = z
@@ -31,7 +31,7 @@ export default fp(
       const { menage_id, section_id, logement_id, logement_room_id, page, limit } =
         listPhotosSchema.parse(request.query);
       if (menage_id) {
-        await requirePermissionForMenage(fastify.db, request.user.sub, menage_id, 'view_photos');
+        await requireMenageAccess(fastify.db, request.user.sub, menage_id, 'view_photos');
         const result = await service.findByMenage(menage_id, { page, limit, section_id });
         return { ...result, data: signUrlsInList(result.data) };
       }
@@ -59,7 +59,7 @@ export default fp(
       const photo = await service.findById(id);
       if (!photo) return reply.notFound('Photo not found');
       if (photo.menage_id) {
-        await requirePermissionForMenage(fastify.db, request.user.sub, photo.menage_id, 'view_photos');
+        await requireMenageAccess(fastify.db, request.user.sub, photo.menage_id, 'view_photos');
       } else if (photo.logement_id) {
         const membership = await getActiveMembership(fastify.db, request.user.sub);
         const logement = await fastify.db('logement').where({ id: photo.logement_id }).first();
@@ -82,7 +82,7 @@ export default fp(
       async (request, reply) => {
       const data = createPhotoSchema.parse(request.body);
       if (data.menage_id) {
-        await requirePermissionForMenage(fastify.db, request.user.sub, data.menage_id, 'edit');
+        await requireMenageAccess(fastify.db, request.user.sub, data.menage_id, 'edit');
         // Si un rattachement à une pièce est fourni, la section doit appartenir à ce ménage
         if (data.section_id) {
           const section = await fastify.db('menage_check_section')

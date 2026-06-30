@@ -502,7 +502,7 @@ Sections (= pièces) et items générés automatiquement à la création du mén
 
 Types de section : `kitchen, living_room, bedroom, bathroom, wc, exterior, basement, laundry, general`.
 
-Le toggle est accessible au **prestataire assigné** du ménage OU à toute personne avec `can_edit` sur le logement.
+La lecture (`GET …/check`) et le toggle sont accessibles à tout **prestataire affecté au ménage** — référent (`prestataire_user_id`) **ou** multi-affecté (`menage_prestataire`), remplaçant non membre du logement inclus — OU à toute personne avec `view_checklist` (lecture) / `can_edit` (toggle) sur le logement.
 
 ---
 
@@ -677,9 +677,11 @@ Le endpoint filtre :
 
 Une photo peut être rattachée à un **ménage** (avec ou sans `section_id`) OU directement à un **logement** (avec un `logement_room_id` optionnel pour la rattacher à une pièce). Au moins l'un des deux (`menage_id` ou `logement_id`) doit être fourni.
 
+> **Accès aux photos d'un ménage** (GET/POST `menage_id`) : autorisé si l'utilisateur est **affecté au ménage** (référent `prestataire_user_id` **ou** multi-affecté via `menage_prestataire`) — y compris un remplaçant non membre du logement — OU s'il a la permission logement (`view_photos` pour lire, `can_edit` pour poster ; admin/créateur inclus). La suppression reste réservée à l'uploader ou à `can_edit`.
+
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/photos?menage_id=&section_id=` | Photos du ménage (requiert `view_photos`) — `section_id` filtre par pièce |
+| GET | `/photos?menage_id=&section_id=` | Photos du ménage (affecté au ménage OU `view_photos`) — `section_id` filtre par pièce |
 | GET | `/photos?logement_id=&logement_room_id=` | Photos du logement (et filtrage par pièce) |
 | GET | `/photos/:id` | Détail |
 | POST | `/photos` | Upload — body inclut `menage_id` OU `logement_id` |
@@ -755,9 +757,11 @@ identique dans les deux modes — le client passe toujours par les routes `/file
 
 Discussion liée à un ménage, optionnellement scopée à une section.
 
+> **Accès** : lire/écrire un commentaire est autorisé si l'utilisateur est **affecté au ménage** (référent ou multi-affecté, remplaçant inclus) OU a `view_comments` sur le logement (admin/créateur inclus). L'édition/suppression d'un commentaire d'autrui requiert `can_edit`.
+
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/comments?menage_id=&section_id=` | Liste (section_id='general' pour hors-section) |
+| GET | `/comments?menage_id=&section_id=` | Liste (affecté au ménage OU `view_comments`) — section_id='general' pour hors-section |
 | GET | `/comments/:id` | Détail |
 | POST | `/comments` | Crée un commentaire |
 | PATCH | `/comments/:id` | Édite (auteur uniquement) |

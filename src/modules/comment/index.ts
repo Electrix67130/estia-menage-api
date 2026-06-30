@@ -2,7 +2,7 @@ import fp from 'fastify-plugin';
 import { z } from 'zod';
 import CommentService from './comment.service';
 import { createCommentSchema, updateCommentSchema } from './comment.schema';
-import { requirePermissionForMenage } from '@/lib/permissions';
+import { requireMenageAccess, requirePermissionForMenage } from '@/lib/permissions';
 import { emitToMenage, getMenageRecipientIds } from '@/lib/realtime-hub';
 import { sendPushToUsers } from '@/lib/push';
 
@@ -25,7 +25,7 @@ export default fp(
     // GET /comments?menage_id=xxx[&section_id=...] — requires view_comments
     fastify.get('/comments', { preHandler: [fastify.authenticate] }, async (request) => {
       const { menage_id, section_id, ...pagination } = byMenageSchema.parse(request.query);
-      await requirePermissionForMenage(fastify.db, request.user.sub, menage_id, 'view_comments');
+      await requireMenageAccess(fastify.db, request.user.sub, menage_id, 'view_comments');
       return service.findByMenage(menage_id, { ...pagination, sectionId: section_id });
     });
 
@@ -33,7 +33,7 @@ export default fp(
       const { id } = uuidSchema.parse(request.params);
       const comment = await service.findById(id);
       if (!comment) return reply.notFound('Comment not found');
-      await requirePermissionForMenage(
+      await requireMenageAccess(
         fastify.db,
         request.user.sub,
         comment.menage_id,
@@ -44,7 +44,7 @@ export default fp(
 
     fastify.post('/comments', { preHandler: [fastify.authenticate], config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
       const data = createCommentSchema.parse(request.body);
-      await requirePermissionForMenage(fastify.db, request.user.sub, data.menage_id, 'view_comments');
+      await requireMenageAccess(fastify.db, request.user.sub, data.menage_id, 'view_comments');
 
       // Si section_id fourni, verifier qu'elle appartient bien au meme menage
       if (data.section_id) {
