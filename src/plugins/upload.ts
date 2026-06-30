@@ -70,7 +70,15 @@ async function uploadPlugin(fastify: FastifyInstance) {
   });
 
   // POST /upload — upload a file (authenticated)
-  fastify.post('/upload', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+  // Limite généreuse : un envoi groupé de photos (mobile/dashboard) est légitime
+  // et ne doit pas tripper le rate-limit global (100/min).
+  fastify.post(
+    '/upload',
+    {
+      preHandler: [fastify.authenticate],
+      config: { rateLimit: { max: 200, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
     const data = await request.file();
     if (!data) {
       return reply.badRequest('No file provided');

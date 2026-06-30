@@ -264,6 +264,35 @@ Permissions par défaut selon rôle (cf. `logement-member.service.ts`):
 
 ---
 
+## Logement external calendar (iCal Airbnb / Booking…)
+
+Calendriers iCal externes rattachés à un logement. **Admin only** (même org que le logement). Un worker (`src/lib/ical-worker.ts`) synchronise les calendriers activés **toutes les 30 min** : il crée/met à jour/annule les `menage` correspondants (parser RFC 5545 maison, respect de `date_locked`). Le dashboard expose la config dans la fiche logement (section « Calendriers externes »).
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/logement-external-calendars?logement_id=` | Liste des calendriers du logement → `{ data: [...] }` (admin) |
+| POST | `/logement-external-calendars` | Ajoute un calendrier (admin) |
+| PATCH | `/logement-external-calendars/:id` | Modifie (`url`, `provider`, `label`, `enabled`) (admin) |
+| DELETE | `/logement-external-calendars/:id` | Supprime (admin) — n'efface pas les ménages déjà créés |
+| POST | `/logement-external-calendars/:id/sync` | Déclenche une synchro manuelle (admin) |
+
+`POST /logement-external-calendars` body :
+```json
+{
+  "logement_id": "uuid",
+  "url": "https://www.airbnb.fr/calendar/ical/123.ics?s=...",
+  "provider": "airbnb",
+  "label": "Annonce Airbnb",
+  "enabled": true
+}
+```
+
+- `provider` ∈ `airbnb` | `booking` | `vrbo` | `ical` (défaut `ical`). `url` (requise, ≤1000). `label` optionnel. `enabled` défaut `true`.
+- Champs lecture : `last_synced_at`, `last_error` (dernière erreur de fetch/parse).
+- `POST …/:id/sync` réponse : `{ fetched_events, created_menages, updated_menages, cancelled_menages, error?, calendar }`.
+
+---
+
 ## Menage
 
 Prestation de ménage datée, FK logement + prestataire.
@@ -687,13 +716,15 @@ Champs supportés (`POST /photos`) :
 
 L'upload du fichier lui-même passe par `POST /upload` (multipart) qui retourne une URL signée.
 
+> `POST /photos` a un rate-limit dédié **200/min** (aligné sur `/upload`) : un envoi groupé génère une requête `/upload` + une requête `/photos` par photo, ce qui dépasserait vite le rate-limit global de 100/min.
+
 ---
 
 ## Upload de fichiers
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| POST | `/upload` | Upload multipart (champ fichier). Authentifié. Max 10 Mo. |
+| POST | `/upload` | Upload multipart (champ fichier). Authentifié. Max 10 Mo. Rate-limit dédié **200/min** (envoi groupé de photos). Images optimisées serveur (resize 2000px, recompression, strip EXIF). |
 | GET | `/files/token/:filename` | Génère une URL de téléchargement signée (token TTL 5 min). Authentifié. |
 | GET | `/files/:filename?t=<token>` | Sert le fichier si le token est valide (pas d'API key requise). |
 
@@ -797,7 +828,7 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 
 Chaque notification embarque `data: { menage_id, type }` pour router vers le ménage au tap.
 
-**Anti-abus** : rate-limit global 100 req/min/IP, + limites serrées sur les endpoints « bruyants » (`POST /comments` 20/min, `POST /menages/:id/responses` 30/min, `POST /reschedule-requests` 10/min), + **throttle par destinataire** dans `sendPushToUsers` (max 8 push/min/user, fenêtre glissante en mémoire) pour qu'un abus ne noie pas la victime.
+**Anti-abus** : rate-limit global 100 req/min/IP, + limites serrées sur les endpoints « bruyants » (`POST /comments` 20/min, `POST /menages/:id/responses` 30/min, `POST /reschedule-requests` 10/min), + limites **élargies** sur l'upload de photos (`POST /upload` et `POST /photos` 200/min, car un envoi groupé est légitime), + **throttle par destinataire** dans `sendPushToUsers` (max 8 push/min/user, fenêtre glissante en mémoire) pour qu'un abus ne noie pas la victime.
 
 > **URLs de fichiers signées à la lecture** (token TTL 5 min, comme `/files`) : `avatar_url` (`/auth/me` + listes), `cover_photo_url` du logement (liste + détail), `photo_url` des pièces (`/logement-rooms`), `arrival_photo_url`/`departure_photo_url` du ménage (détail, liste, réponses pointage), et `url`/`thumbnail_url` des photos (`/photos`). Les URLs externes (ne contenant pas `/files/`) sont laissées intactes.
 

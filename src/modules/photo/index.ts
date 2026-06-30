@@ -71,7 +71,15 @@ export default fp(
     });
 
     // POST /photos — requires edit on menage, OR admin for logement-level photos
-    fastify.post('/photos', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    // Limite généreuse alignée sur /upload : un envoi groupé de photos génère
+    // une requête /photos par fichier et ne doit pas tripper le rate-limit global.
+    fastify.post(
+      '/photos',
+      {
+        preHandler: [fastify.authenticate],
+        config: { rateLimit: { max: 200, timeWindow: '1 minute' } },
+      },
+      async (request, reply) => {
       const data = createPhotoSchema.parse(request.body);
       if (data.menage_id) {
         await requirePermissionForMenage(fastify.db, request.user.sub, data.menage_id, 'edit');
