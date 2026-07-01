@@ -229,8 +229,20 @@ export default fp(
       // Changement de statut « à la main » = admin uniquement (correction d'un
       // statut erroné, ex. repassé en « à venir » un ménage terminé par erreur).
       const isStatusEdit = 'status' in data && data.status !== undefined && data.status !== existing.status;
+      // Édition des tarifs / du linge = admin uniquement (les frontends ne
+      // l'exposent qu'aux admins ; on verrouille aussi côté serveur pour qu'un
+      // membre logement avec `can_edit` ne puisse pas changer les prix).
+      const FINANCIAL_FIELDS = [
+        'client_price_ht',
+        'client_vat_rate',
+        'provider_price',
+        'laundry_included',
+        'laundry_client_price_ht',
+        'laundry_provider_price',
+      ] as const;
+      const isFinancialEdit = FINANCIAL_FIELDS.some((f) => f in data);
 
-      if (isPrestataireChange || isTimestampEdit || isStatusEdit) {
+      if (isPrestataireChange || isTimestampEdit || isStatusEdit || isFinancialEdit) {
         const membership = await getActiveMembership(fastify.db, request.user.sub);
         if (
           membership?.role !== 'admin' ||
@@ -243,7 +255,9 @@ export default fp(
               ? "Seul un administrateur peut modifier les heures d'arrivée/départ"
               : isStatusEdit
                 ? 'Seul un administrateur peut modifier le statut d’un ménage'
-                : 'Seul un administrateur peut affecter un prestataire à un ménage',
+                : isFinancialEdit
+                  ? 'Seul un administrateur peut modifier les tarifs d’un ménage'
+                  : 'Seul un administrateur peut affecter un prestataire à un ménage',
           });
         }
       } else {
