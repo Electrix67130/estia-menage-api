@@ -33,6 +33,7 @@ export type MenageResponseWithUser = MenageResponseRow & {
 export type MyUpcomingMenage = {
   id: string;
   logement_id: string;
+  prestation_type: 'menage' | 'check_in' | 'check_out';
   logement_name: string | null;
   logement_address: string | null;
   logement_city: string | null;

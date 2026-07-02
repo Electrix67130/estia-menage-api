@@ -8,6 +8,7 @@ import {
   validateReportSchema,
   pointageSchema,
   arrivalSchema,
+  checkPointageSchema,
   listMenagesSchema,
   serializeMenageForRole,
 } from './menage.schema';
@@ -391,8 +392,6 @@ export default fp(
       { preHandler: [fastify.authenticate] },
       async (request, reply) => {
         const { id } = uuidSchema.parse(request.params);
-        const { photo_url, lat, lng, traveler_rating, has_degradation, degradation_note, degradation_photos } =
-          arrivalSchema.parse(request.body);
         const existing = await service.findById(id);
         if (!existing) return reply.notFound('Menage not found');
         if (existing.prestataire_user_id !== request.user.sub) {
@@ -402,6 +401,13 @@ export default fp(
             message: 'Seul le prestataire assigné peut pointer son arrivée',
           });
         }
+        // Ménage : photo géolocalisée obligatoire. Check-in/check-out : pointage
+        // optionnel, sans photo ni GPS.
+        const isCheck = existing.prestation_type !== 'menage';
+        const { photo_url, lat, lng, traveler_rating, has_degradation, degradation_note, degradation_photos } =
+          isCheck
+            ? { ...checkPointageSchema.parse(request.body ?? {}), degradation_photos: undefined }
+            : arrivalSchema.parse(request.body);
         const updated = await service.recordArrival(
           id,
           { photoUrl: photo_url, lat, lng },
@@ -431,7 +437,6 @@ export default fp(
       { preHandler: [fastify.authenticate] },
       async (request, reply) => {
         const { id } = uuidSchema.parse(request.params);
-        const { photo_url, lat, lng } = pointageSchema.parse(request.body);
         const existing = await service.findById(id);
         if (!existing) return reply.notFound('Menage not found');
         if (existing.prestataire_user_id !== request.user.sub) {
@@ -441,6 +446,11 @@ export default fp(
             message: 'Seul le prestataire assigné peut pointer son départ',
           });
         }
+        // Ménage : photo géolocalisée obligatoire. Check-in/check-out : optionnel.
+        const isCheck = existing.prestation_type !== 'menage';
+        const { photo_url, lat, lng } = isCheck
+          ? checkPointageSchema.parse(request.body ?? {})
+          : pointageSchema.parse(request.body);
         const updated = await service.recordDeparture(id, { photoUrl: photo_url, lat, lng });
         emitToMenage(fastify.db, id, {
           type: 'menage.departure',

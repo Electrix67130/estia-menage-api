@@ -153,6 +153,8 @@ Bien locatif paramétrable. Source des paramètres de génération de checklist.
   "has_laundry": true,
   "has_pool": false,
   "has_jacuzzi": false,
+  "enable_check_in": false,
+  "enable_check_out": false,
   "surface_m2": 35,
   "notes": "Code interphone : 1234B",
   "key_safe_code": "1234",
@@ -166,6 +168,7 @@ Champs spécifiques :
 - `key_safe_code` (string, max 50) — code de boîte à clef, masqué par défaut côté UI mobile (eye toggle pour révéler). Visible à l'admin + à tout `logement_member` (les prestas en ont besoin pour entrer).
 - `cover_photo_url` (string, max 500) — URL d'une photo de profil/cover du logement (uploadée via le flow `/upload` puis PATCH avec l'URL retournée).
 - `n_lit_simple` / `n_lit_double` / `n_canape_lit` / `n_lit_appoint` (int 0-50, default 0) — composition des lits du bien. Ces valeurs sont **copiées sur chaque nouveau ménage** à la création (cf. `POST /menages`) puis modifiables indépendamment par ménage (saisonnalité, demande spéciale).
+- `enable_check_in` / `enable_check_out` (bool, default false) — activent les prestations check-in (accueil/remise de clés) et check-out (état des lieux) sur le logement. Une fois activées, ces prestations sont matérialisées comme `menage.prestation_type='check_in'`/`'check_out'` (via sync iCal + création manuelle).
 
 ### Auto-génération des pièces
 
@@ -301,10 +304,10 @@ Chaque ménage sérialisé (liste **et** détail) inclut un booléen calculé **
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/menages?status=&prestataire_user_id=&logement_id=&validated=&unassigned=&manager=me&from=&to=` | Liste filtrable. Chaque ménage inclut un booléen `has_pending_reschedule` (true s'il existe au moins une `menage_reschedule_request` `status='pending'`) — sert à afficher un badge "demande en attente" sur les cards admin. |
+| GET | `/menages?status=&type=&prestataire_user_id=&logement_id=&validated=&unassigned=&manager=me&from=&to=` | Liste filtrable. `type` = `menage`\|`check_in`\|`check_out` (défaut : tous types). Chaque ménage inclut un booléen `has_pending_reschedule` (true s'il existe au moins une `menage_reschedule_request` `status='pending'`) — sert à afficher un badge "demande en attente" sur les cards admin. |
 | GET | `/menages/:id` | Détail (inclut aussi `has_pending_reschedule`). |
 | GET | `/menages/:id/eligible-prestataires` | **Tous** les prestataires de l'org, avec un flag `is_member` (membre prestataire du logement). Les non-membres peuvent être affectés **ponctuellement** (remplacement) — ils ne reçoivent que ce ménage |
-| POST | `/menages` | Création (admin) — **génère auto la checklist** |
+| POST | `/menages` | Création (admin) — **génère auto la checklist**. Accepte `prestation_type` (`menage` par défaut) pour créer un check-in/check-out manuellement. |
 | PATCH | `/menages/:id` | Mise à jour (manager/admin via can_edit) — accepte `prestataire_user_id` pour affecter/désaffecter. **Changement de `status` = admin uniquement** (correction d'un statut erroné) : repasser en `a_venir` efface `arrived_at`+`departed_at`, repasser en `en_cours` efface `departed_at` (sauf valeurs explicitement fournies). Si on modifie `date_prevue` sur un ménage rattaché à un calendrier externe, `date_locked` est posé à `true` automatiquement (sauf valeur explicite). |
 | DELETE | `/menages/:id` | Suppression (admin) |
 | POST | `/menages/:id/arrival` | Pointage arrivée (prestataire assigné) — body `{ photo_url, lat, lng, traveler_rating?, has_degradation?, degradation_note?, degradation_photos? }`. Photo géolocalisée obligatoire. `traveler_rating` 1-5. Si `has_degradation`, `degradation_photos: [{ url, thumbnail_url?, file_size?, mime_type? }]` est enregistré dans `photo` avec `is_degradation=true`. Nouveaux champs optionnels (rétro-compat). |

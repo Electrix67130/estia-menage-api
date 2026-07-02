@@ -114,17 +114,23 @@ class LogementExternalCalendarService {
     const externalSource = `cal_${cal.provider}`;
     const existing = (await this.db('menage')
       .where({ external_calendar_id: cal.id })
-      .select('id', 'external_event_uid', 'date_prevue', 'status', 'date_locked', 'next_checkin_at', 'stay_nights')) as Array<{
+      .select('id', 'external_event_uid', 'prestation_type', 'date_prevue', 'status', 'date_locked', 'next_checkin_at', 'stay_nights')) as Array<{
       id: string;
       external_event_uid: string;
+      prestation_type: 'menage' | 'check_in' | 'check_out';
       date_prevue: string | Date;
       status: string;
       date_locked: boolean;
       next_checkin_at: string | Date | null;
       stay_nights: number | null;
     }>;
-    const existingByUid = new Map(existing.map((m) => [m.external_event_uid, m]));
-    const seenUids = new Set<string>();
+    // Une réservation (UID) peut désormais matérialiser jusqu'à 3 prestations
+    // (ménage + check-in + check-out) → clé d'unicité composite `uid:type`.
+    const keyOf = (uid: string, type: string): string => `${uid}:${type}`;
+    const existingByKey = new Map(
+      existing.map((m) => [keyOf(m.external_event_uid, m.prestation_type), m]),
+    );
+    const seenKeys = new Set<string>();
     const createdMenageIds: string[] = [];
     const cancelledMenageIds: string[] = [];
 
@@ -162,73 +168,99 @@ class LogementExternalCalendarService {
       // résa devenue blocage), il sera annulé par la boucle CANCEL plus bas.
       if (isBlockedEvent(ev)) continue;
 
-      seenUids.add(ev.uid);
       const nc = nextCheckinAfter(ev.end_date);
       const nights = nightsOf(ev.start_date, ev.end_date);
-      const prev = existingByUid.get(ev.uid);
-      if (prev) {
-        // UPDATE — si la date a changé OU si le ménage avait été annulé,
-        // on le ré-active à la nouvelle date. `date_prevue` peut revenir en
-        // `Date` (colonne `date` parsée par node-pg) → normalisation locale.
-        const dateChanged = ymd(prev.date_prevue) !== ev.end_date;
-        const wasCancelled = prev.status === 'annule';
-        const ncChanged = (prev.next_checkin_at ? ymd(prev.next_checkin_at) : null) !== nc;
-        const nightsChanged = (prev.stay_nights ?? null) !== nights;
-        if (dateChanged || wasCancelled || ncChanged || nightsChanged) {
-          // Si la date a été verrouillée manuellement (admin a approuvé un
-          // reschedule ou modifié la date à la main), on garde la date
-          // locale et on se contente de ré-activer un ménage annulé.
-          const update: Record<string, unknown> = { updated_at: new Date() };
-          if (!prev.date_locked && dateChanged) update.date_prevue = ev.end_date;
-          if (wasCancelled) update.status = 'a_venir';
-          if (ncChanged) update.next_checkin_at = nc;
-          if (nightsChanged) update.stay_nights = nights;
-          if (Object.keys(update).length > 1) {
-            await this.db('menage').where({ id: prev.id }).update(update);
-            result.updated_menages++;
+
+      // Prestations à matérialiser pour cette réservation. Le ménage (sur le
+      // check-out = end_date) est toujours créé, comme historiquement. Les
+      // check-in (arrivée = start_date) / check-out (départ = end_date) ne sont
+      // créés que si le logement les active. `next_checkin_at` / `stay_nights`
+      // ne concernent que le ménage (planification du nettoyage).
+      const targets: Array<{
+        type: 'menage' | 'check_in' | 'check_out';
+        date: string;
+        nc: string | null;
+        nights: number | null;
+      }> = [{ type: 'menage', date: ev.end_date, nc, nights }];
+      if (logement.enable_check_in)
+        targets.push({ type: 'check_in', date: ev.start_date, nc: null, nights: null });
+      if (logement.enable_check_out)
+        targets.push({ type: 'check_out', date: ev.end_date, nc: null, nights: null });
+
+      for (const t of targets) {
+        const key = keyOf(ev.uid, t.type);
+        seenKeys.add(key);
+        const isMenageType = t.type === 'menage';
+        const prev = existingByKey.get(key);
+        if (prev) {
+          // UPDATE — si la date a changé OU si la prestation avait été annulée,
+          // on la ré-active à la nouvelle date. `date_prevue` peut revenir en
+          // `Date` (colonne `date` parsée par node-pg) → normalisation locale.
+          const dateChanged = ymd(prev.date_prevue) !== t.date;
+          const wasCancelled = prev.status === 'annule';
+          const ncChanged = (prev.next_checkin_at ? ymd(prev.next_checkin_at) : null) !== t.nc;
+          const nightsChanged = (prev.stay_nights ?? null) !== t.nights;
+          if (dateChanged || wasCancelled || ncChanged || nightsChanged) {
+            // Si la date a été verrouillée manuellement (admin a approuvé un
+            // reschedule ou modifié la date à la main), on garde la date
+            // locale et on se contente de ré-activer une prestation annulée.
+            const update: Record<string, unknown> = { updated_at: new Date() };
+            if (!prev.date_locked && dateChanged) update.date_prevue = t.date;
+            if (wasCancelled) update.status = 'a_venir';
+            if (ncChanged) update.next_checkin_at = t.nc;
+            if (nightsChanged) update.stay_nights = t.nights;
+            if (Object.keys(update).length > 1) {
+              await this.db('menage').where({ id: prev.id }).update(update);
+              result.updated_menages++;
+            }
           }
+          continue;
         }
-        continue;
+
+        // CREATE — les montants (prix, blanchisserie) ne sont copiés que pour le
+        // ménage ; check-in/check-out démarrent sans tarif (l'admin ajuste).
+        const insertData = {
+          logement_id: cal.logement_id,
+          organization_id: logement.organization_id,
+          created_by: logement.created_by,
+          prestataire_user_id: null,
+          prestation_type: t.type,
+          status: 'a_venir' as const,
+          date_prevue: t.date,
+          next_checkin_at: t.nc,
+          stay_nights: t.nights,
+          horaire_prevu: logement.default_horaire_debut ?? null,
+          horaire_fin_prevu: logement.default_horaire_fin ?? null,
+          duree_estimee_min: isMenageType ? defaultDuration : null,
+          client_price_ht: isMenageType ? defaultClientPrice : null,
+          client_vat_rate: isMenageType ? defaultClientVat : null,
+          provider_price: isMenageType ? defaultProviderPrice : null,
+          laundry_included: isMenageType ? defaultLaundryIncluded : false,
+          laundry_client_price_ht:
+            isMenageType && defaultLaundryIncluded ? defaultLaundryClient : null,
+          laundry_provider_price:
+            isMenageType && defaultLaundryIncluded ? defaultLaundryProvider : null,
+          notes_intervention: ev.summary ? `Auto (${cal.provider}) : ${ev.summary}` : `Auto (${cal.provider})`,
+          external_source: externalSource,
+          external_event_uid: ev.uid,
+          external_calendar_id: cal.id,
+        };
+
+        await this.db.transaction(async (trx) => {
+          const [menage] = (await trx('menage').insert(insertData).returning('*')) as Array<{
+            id: string;
+          }>;
+          await generateChecklistForMenage(trx, menage.id, logement);
+          createdMenageIds.push(menage.id);
+        });
+        result.created_menages++;
       }
-
-      // CREATE
-      const insertData = {
-        logement_id: cal.logement_id,
-        organization_id: logement.organization_id,
-        created_by: logement.created_by,
-        prestataire_user_id: null,
-        status: 'a_venir' as const,
-        date_prevue: ev.end_date,
-        next_checkin_at: nc,
-        stay_nights: nights,
-        horaire_prevu: logement.default_horaire_debut ?? null,
-        horaire_fin_prevu: logement.default_horaire_fin ?? null,
-        duree_estimee_min: defaultDuration,
-        client_price_ht: defaultClientPrice,
-        client_vat_rate: defaultClientVat,
-        provider_price: defaultProviderPrice,
-        laundry_included: defaultLaundryIncluded,
-        laundry_client_price_ht: defaultLaundryIncluded ? defaultLaundryClient : null,
-        laundry_provider_price: defaultLaundryIncluded ? defaultLaundryProvider : null,
-        notes_intervention: ev.summary ? `Auto (${cal.provider}) : ${ev.summary}` : `Auto (${cal.provider})`,
-        external_source: externalSource,
-        external_event_uid: ev.uid,
-        external_calendar_id: cal.id,
-      };
-
-      await this.db.transaction(async (trx) => {
-        const [menage] = (await trx('menage').insert(insertData).returning('*')) as Array<{
-          id: string;
-        }>;
-        await generateChecklistForMenage(trx, menage.id, logement);
-        createdMenageIds.push(menage.id);
-      });
-      result.created_menages++;
     }
 
-    // CANCEL — ménages connus mais plus dans le feed (booking annulée par exemple).
+    // CANCEL — prestations connues mais plus dans le feed (booking annulée) OU
+    // dont le type n'est plus activé sur le logement (toggle check-in/out coupé).
     for (const prev of existing) {
-      if (seenUids.has(prev.external_event_uid)) continue;
+      if (seenKeys.has(keyOf(prev.external_event_uid, prev.prestation_type))) continue;
       if (prev.status === 'valide' || prev.status === 'annule' || prev.status === 'termine') continue;
       await this.db('menage')
         .where({ id: prev.id })

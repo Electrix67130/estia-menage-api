@@ -83,6 +83,17 @@ export default fp(
       const data = createPhotoSchema.parse(request.body);
       if (data.menage_id) {
         await requireMenageAccess(fastify.db, request.user.sub, data.menage_id, 'edit');
+        // Pas de galerie photos sur les prestations check-in/check-out (décision produit).
+        const menageRow = await fastify.db('menage')
+          .where({ id: data.menage_id })
+          .first('prestation_type');
+        if (menageRow && menageRow.prestation_type !== 'menage') {
+          return reply.code(400).send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Les photos ne sont pas disponibles sur un check-in/check-out',
+          });
+        }
         // Si un rattachement à une pièce est fourni, la section doit appartenir à ce ménage
         if (data.section_id) {
           const section = await fastify.db('menage_check_section')

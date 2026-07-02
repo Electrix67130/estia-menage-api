@@ -21,6 +21,8 @@ export const createLogementSchema = z.object({
   has_laundry: z.boolean().default(false),
   has_pool: z.boolean().default(false),
   has_jacuzzi: z.boolean().default(false),
+  enable_check_in: z.boolean().default(false),
+  enable_check_out: z.boolean().default(false),
   surface_m2: z.number().int().min(0).max(10000).optional(),
   notes: z.string().max(5000).optional(),
   proprietaire_user_id: z.string().uuid().optional(),
@@ -64,6 +66,8 @@ export const updateLogementSchema = z.object({
   has_laundry: z.boolean().optional(),
   has_pool: z.boolean().optional(),
   has_jacuzzi: z.boolean().optional(),
+  enable_check_in: z.boolean().optional(),
+  enable_check_out: z.boolean().optional(),
   surface_m2: z.number().int().min(0).max(10000).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
   proprietaire_user_id: z.string().uuid().nullable().optional(),
@@ -111,6 +115,8 @@ export type LogementRow = {
   has_laundry: boolean;
   has_pool: boolean;
   has_jacuzzi: boolean;
+  enable_check_in: boolean;
+  enable_check_out: boolean;
   surface_m2: number | null;
   notes: string | null;
   key_safe_code: string | null;

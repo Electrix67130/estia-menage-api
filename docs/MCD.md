@@ -94,6 +94,8 @@ Bien locatif paramétrable.
 | has_laundry | boolean default false | |
 | has_pool | boolean default false | piscine → génère une section checklist `pool` |
 | has_jacuzzi | boolean default false | jacuzzi → génère une section checklist `jacuzzi` |
+| enable_check_in | boolean notnull default false | active la prestation check-in (accueil/remise de clés) sur ce logement → matérialisée via iCal + création manuelle (`menage.prestation_type='check_in'`) |
+| enable_check_out | boolean notnull default false | active la prestation check-out (état des lieux/inventaire) → `menage.prestation_type='check_out'` |
 | surface_m2 | int | |
 | notes | text | |
 | key_safe_code | varchar(50) | code de boîte à clef (saisi par l'admin, visible aux membres du logement) ; UI masque le contenu avec un eye toggle |
@@ -114,6 +116,7 @@ Prestation de ménage datée.
 | organization_id | uuid FK organization CASCADE notnull | |
 | created_by | uuid FK user notnull | |
 | prestataire_user_id | uuid FK user SET NULL | assigné |
+| prestation_type | enum `menage_prestation_type` notnull default `menage` | `menage/check_in/check_out` — la table `menage` porte les 3 types (« prestation » = terme UI). Assignation, réponses présent/absent, pointage, photos réutilisés quel que soit le type. |
 | status | enum `menage_status` notnull default `a_venir` | `a_venir/en_cours/termine/valide/annule` |
 | date_prevue | date notnull | date planifiée |
 | date_locked | boolean notnull default false | Verrou contre la sync iCal. Posé à `true` quand l'admin approuve une demande de report avec `apply_to_menage`, ou qu'il modifie manuellement `date_prevue` sur un ménage rattaché à un calendrier externe. La sync iCal saute le `UPDATE date_prevue` sur ces lignes. |
@@ -142,7 +145,7 @@ Prestation de ménage datée.
 | archived_at | timestamp | |
 | created_at, updated_at | timestamp | |
 
-INDEX : `(logement_id, date_prevue)`, `(prestataire_user_id, status)`, `(organization_id, status)`.
+INDEX : `(logement_id, date_prevue)`, `(prestataire_user_id, status)`, `(organization_id, status)`, `(organization_id, prestation_type, status)`.
 
 ### `logement_member`
 Permissions permanentes par logement.
@@ -387,6 +390,8 @@ Calendriers externes (iCal Airbnb / Booking / Vrbo) connectés à un logement. U
 | created_at, updated_at | timestamp | |
 
 Note : `menage` porte `external_source` (`cal_<provider>`), `external_event_uid` (UID du VEVENT) et **`external_calendar_id`** (FK `logement_external_calendar`, ON DELETE SET NULL) pour rattacher chaque ménage auto au calendrier précis qui l'a généré. La sync scope création/màj/annulation sur `external_calendar_id` — ainsi deux calendriers du même provider sur un logement ne s'annulent plus mutuellement.
+
+Contrainte d'unicité `uniq_menage_external_event` = `(external_source, external_event_uid, prestation_type)` : une même réservation iCal peut matérialiser jusqu'à 3 prestations (ménage + check-in + check-out) selon les toggles `logement.enable_check_in`/`enable_check_out`.
 
 ### `error_log`
 Journal des erreurs 500 (« Sentry maison »), alimenté en fire-and-forget par le plugin `error-handler` à chaque erreur inconnue (migration 20260604120000).

@@ -135,6 +135,7 @@ class MenageResponseService {
       .select(
         'menage.id',
         'menage.logement_id',
+        'menage.prestation_type',
         'menage.date_prevue',
         'menage.horaire_prevu',
         'menage.duree_estimee_min',
@@ -166,6 +167,7 @@ class MenageResponseService {
         status: rest.status as MenageStatus,
         date_prevue: rest.date_prevue,
         arrived_at,
+        prestation_type: rest.prestation_type,
       }),
     }));
   }

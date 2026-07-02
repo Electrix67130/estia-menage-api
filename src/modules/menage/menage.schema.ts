@@ -3,8 +3,16 @@ import { z } from 'zod';
 export const menageStatusEnum = z.enum(['a_venir', 'en_cours', 'termine', 'valide', 'annule']);
 export type MenageStatus = z.infer<typeof menageStatusEnum>;
 
+/**
+ * Type de prestation. La table `menage` porte les 3 types ; « prestation » est
+ * le terme UI générique. `menage` par défaut (rétro-compat).
+ */
+export const prestationTypeEnum = z.enum(['menage', 'check_in', 'check_out']);
+export type PrestationType = z.infer<typeof prestationTypeEnum>;
+
 export const createMenageSchema = z.object({
   logement_id: z.string().uuid(),
+  prestation_type: prestationTypeEnum.optional(),
   prestataire_user_id: z.string().uuid().optional(),
   date_prevue: z.string(), // YYYY-MM-DD
   horaire_prevu: z.string().optional(), // HH:MM[:SS] — début de la tranche
@@ -74,6 +82,22 @@ export const pointageSchema = z.object({
  * Champs nouveaux tous OPTIONNELS (rétro-compat : l'app mobile actuelle n'envoie
  * que photo_url/lat/lng). L'obligation est imposée par la nouvelle UI mobile.
  */
+/**
+ * Pointage des prestations check-in / check-out : photo + GPS OPTIONNELS
+ * (pas d'exigence de preuve géolocalisée, cf. décision produit). Le pointage
+ * lui-même reste optionnel côté UI. Les autres champs de déclaration
+ * (traveler_rating, dégradation) restent disponibles (utile au check-out).
+ */
+export const checkPointageSchema = z.object({
+  photo_url: z.string().url().max(500).optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+  traveler_rating: z.number().int().min(1).max(5).optional(),
+  has_degradation: z.boolean().optional(),
+  degradation_note: z.string().max(5000).optional(),
+});
+export type CheckPointage = z.infer<typeof checkPointageSchema>;
+
 export const arrivalSchema = pointageSchema.extend({
   traveler_rating: z.number().int().min(1).max(5).optional(),
   has_degradation: z.boolean().optional(),
@@ -93,6 +117,8 @@ export const arrivalSchema = pointageSchema.extend({
 
 export const listMenagesSchema = z.object({
   status: menageStatusEnum.optional(),
+  /** Filtre par type de prestation (dashboard : menus séparés check-in/out). */
+  type: prestationTypeEnum.optional(),
   prestataire_user_id: z.string().uuid().optional(),
   logement_id: z.string().uuid().optional(),
   validated: z
@@ -131,6 +157,7 @@ export type MenageRow = {
   organization_id: string;
   created_by: string;
   prestataire_user_id: string | null;
+  prestation_type: PrestationType;
   status: MenageStatus;
   date_prevue: string;
   /** Prochain check-in du logement (date d'arrivée du prochain voyageur, via iCal). */
@@ -214,8 +241,11 @@ export const ADMIN_ONLY_FINANCIAL_FIELDS = [
  * (date_prevue est une DATE sans heure).
  */
 export function computeNeedsAttention(
-  menage: Pick<MenageRow, 'status' | 'date_prevue' | 'arrived_at'>,
+  menage: Pick<MenageRow, 'status' | 'date_prevue' | 'arrived_at'> &
+    Partial<Pick<MenageRow, 'prestation_type'>>,
 ): boolean {
+  // Le pointage est optionnel pour les check-in/check-out → jamais « non pointé ».
+  if (menage.prestation_type && menage.prestation_type !== 'menage') return false;
   if (menage.status !== 'a_venir') return false;
   if (menage.arrived_at) return false;
   if (!menage.date_prevue) return false;

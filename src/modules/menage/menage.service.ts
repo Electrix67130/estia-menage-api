@@ -55,6 +55,7 @@ class MenageService extends BaseService<MenageRow> {
       orderBy = 'date_prevue',
       order = 'desc',
       status,
+      type,
       prestataire_user_id,
       logement_id,
       validated,
@@ -71,6 +72,7 @@ class MenageService extends BaseService<MenageRow> {
     const applyFilters = (qb: Knex.QueryBuilder) => {
       qb.where({ 'menage.organization_id': organizationId }).whereNull('menage.archived_at');
       if (status) qb.where('menage.status', status);
+      if (type) qb.where('menage.prestation_type', type);
       if (prestataire_user_id) qb.where('menage.prestataire_user_id', prestataire_user_id);
       if (logement_id) qb.where('menage.logement_id', logement_id);
       if (validated === true) qb.whereNotNull('menage.validated_at');
@@ -167,7 +169,7 @@ class MenageService extends BaseService<MenageRow> {
 
   async recordArrival(
     id: string,
-    proof: { photoUrl: string; lat: number; lng: number },
+    proof: { photoUrl?: string; lat?: number; lng?: number },
     arrival?: {
       userId: string;
       travelerRating?: number;
@@ -186,11 +188,13 @@ class MenageService extends BaseService<MenageRow> {
       const update: Record<string, unknown> = {
         arrived_at: now,
         status: 'en_cours',
-        arrival_photo_url: proof.photoUrl,
-        arrival_lat: proof.lat,
-        arrival_lng: proof.lng,
         updated_at: now,
       };
+      // Photo + GPS facultatifs (obligatoires pour un ménage — imposé côté route ;
+      // absents pour un check-in/check-out).
+      if (proof.photoUrl !== undefined) update.arrival_photo_url = proof.photoUrl;
+      if (proof.lat !== undefined) update.arrival_lat = proof.lat;
+      if (proof.lng !== undefined) update.arrival_lng = proof.lng;
       if (arrival?.travelerRating !== undefined) update.traveler_rating = arrival.travelerRating;
       if (arrival?.hasDegradation !== undefined) update.has_degradation = arrival.hasDegradation;
       if (arrival?.degradationNote !== undefined) update.degradation_note = arrival.degradationNote;
@@ -217,21 +221,23 @@ class MenageService extends BaseService<MenageRow> {
 
   async recordDeparture(
     id: string,
-    proof: { photoUrl: string; lat: number; lng: number },
+    proof: { photoUrl?: string; lat?: number; lng?: number },
   ): Promise<MenageRow | undefined> {
     const now = new Date();
     const today = now.toISOString().slice(0, 10);
+    const update: Record<string, unknown> = {
+      departed_at: now,
+      date_realisation: today,
+      status: 'termine',
+      updated_at: now,
+    };
+    // Photo + GPS facultatifs (cf. recordArrival).
+    if (proof.photoUrl !== undefined) update.departure_photo_url = proof.photoUrl;
+    if (proof.lat !== undefined) update.departure_lat = proof.lat;
+    if (proof.lng !== undefined) update.departure_lng = proof.lng;
     const [row] = (await this.db('menage')
       .where({ id })
-      .update({
-        departed_at: now,
-        date_realisation: today,
-        status: 'termine',
-        departure_photo_url: proof.photoUrl,
-        departure_lat: proof.lat,
-        departure_lng: proof.lng,
-        updated_at: now,
-      })
+      .update(update)
       .returning('*')) as MenageRow[];
     return row;
   }
