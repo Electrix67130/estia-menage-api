@@ -52,13 +52,38 @@ class LogementService extends BaseService<LogementRow> {
     };
   }
 
-  async archive(id: string): Promise<LogementRow | undefined> {
-    const [row] = (await this.db('logement')
-      .where({ id })
-      .whereNull('archived_at')
-      .update({ archived_at: new Date(), updated_at: new Date() })
-      .returning('*')) as LogementRow[];
-    return row;
+  /**
+   * Archive un logement **en cascade** : le logement lui-même, toutes ses
+   * prestations (ménages/check-in/check-out) encore actives et ses
+   * consommables. Le tout dans une transaction pour rester cohérent.
+   * Retourne le logement archivé + le nombre de prestations archivées.
+   */
+  async archive(
+    id: string,
+  ): Promise<{ logement: LogementRow | undefined; archivedMenages: number }> {
+    const now = new Date();
+    return this.db.transaction(async (trx) => {
+      const [logement] = (await trx('logement')
+        .where({ id })
+        .whereNull('archived_at')
+        .update({ archived_at: now, updated_at: now })
+        .returning('*')) as LogementRow[];
+
+      // Déjà archivé (ou introuvable) → rien à cascader.
+      if (!logement) return { logement, archivedMenages: 0 };
+
+      const archivedMenages = await trx('menage')
+        .where({ logement_id: id })
+        .whereNull('archived_at')
+        .update({ archived_at: now, updated_at: now });
+
+      await trx('logement_consommable')
+        .where({ logement_id: id })
+        .whereNull('archived_at')
+        .update({ archived_at: now, updated_at: now });
+
+      return { logement, archivedMenages };
+    });
   }
 }
 

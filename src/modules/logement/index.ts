@@ -242,8 +242,8 @@ export default fp(
           message: 'Admin only',
         });
       }
-      await service.archive(id);
-      return reply.code(204).send();
+      const { archivedMenages } = await service.archive(id);
+      return reply.code(200).send({ archived_menages: archivedMenages });
     });
 
     done();
