@@ -5,7 +5,11 @@ const TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /** Generate a signed URL for a file path like /files/abc-123.pdf */
 export function signFileUrl(fileUrl: string): string {
-  const filename = fileUrl.split('/').pop();
+  // Retire une éventuelle query (`?t=...`) : signature idempotente même si l'URL
+  // stockée contient déjà un token (cas d'un champ re-persisté depuis une URL
+  // déjà signée). Sans ça, le nom de fichier inclurait le token et l'URL
+  // re-signée serait invalide → 403.
+  const filename = fileUrl.split('/').pop()?.split('?')[0];
   if (!filename) return fileUrl;
 
   const expires = Date.now() + TOKEN_TTL_MS;
