@@ -1,5 +1,8 @@
 # Estia Menage API — Guidelines
 
+> **Contexte produit complet (les 3 apps) :** @CONTEXT.md
+> Lis-le pour comprendre le produit ; **mets-le à jour à chaque modification fonctionnelle**.
+
 API REST pour la gestion de prestations de ménage Estia (logements locatifs + prestataires). Stack : **Fastify + Knex (PostgreSQL) + Zod + TypeScript**.
 
 Entités principales : `logement` (bien paramétrable), `menage` (prestation datée), `menage_check_section/item` (checklist auto-générée), `logement_member` (permissions par logement), `photo` (horodatée), `comment`.
@@ -106,6 +109,7 @@ exports.down = function (knex) { return knex.schema.dropTable('xxx'); };
 
 **Toujours mettre a jour la documentation apres chaque modification.**
 
+- **`.claude/CONTEXT.md`** : carte fonctionnelle des 3 apps — à mettre à jour à **chaque** modification fonctionnelle (feature, flux, déploiement/version)
 - **`docs/API.md`** : chaque ajout/modification/suppression de route
 - **`docs/MCD.md`** : chaque nouvelle migration
 - **`.claude/`** : nouveaux patterns ou conventions
