@@ -507,6 +507,7 @@ export default fp(
       // est le total payé à l'équipe ; on l'attribue intégralement à chaque
       // presta qui l'a effectué (le split éventuel est géré hors-app).
       const query = fastify.db('menage')
+        .leftJoin('logement', 'menage.logement_id', 'logement.id')
         .where('menage.organization_id', organizationId)
         .whereNull('menage.archived_at')
         .where(function () {
@@ -531,6 +532,8 @@ export default fp(
           'menage.id',
           'menage.date_prevue',
           'menage.logement_id',
+          'menage.prestation_type',
+          'logement.name as logement_name',
           'menage.status',
           'menage.provider_price',
           'menage.laundry_provider_price',
@@ -541,6 +544,8 @@ export default fp(
         id: string;
         date_prevue: string;
         logement_id: string;
+        prestation_type: 'menage' | 'check_in' | 'check_out';
+        logement_name: string | null;
         status: string;
         provider_price: string | number | null;
         laundry_provider_price: string | number | null;
@@ -558,6 +563,8 @@ export default fp(
           id: r.id,
           date_prevue: r.date_prevue,
           logement_id: r.logement_id,
+          prestation_type: r.prestation_type,
+          logement_name: r.logement_name,
           status: r.status,
           provider_price: r.provider_price,
           laundry_provider_price: r.laundry_provider_price,
@@ -663,6 +670,8 @@ export default fp(
         'menage.provider_price',
         'menage.laundry_provider_price',
         'menage.laundry_included',
+        'menage.client_price_ht',
+        'menage.laundry_client_price_ht',
         'menage.prestataire_user_id',
         'logement.id as logement_id',
         'logement.name as logement_name',
@@ -675,6 +684,8 @@ export default fp(
         provider_price: string | number | null;
         laundry_provider_price: string | number | null;
         laundry_included: boolean;
+        client_price_ht: string | number | null;
+        laundry_client_price_ht: string | number | null;
         prestataire_user_id: string | null;
         logement_id: string | null;
         logement_name: string | null;
@@ -706,10 +717,14 @@ export default fp(
         prestasByMenage.set(a.menage_id, list);
       }
 
-      type Bucket = { id: string; name: string; total: number; count: number };
+      // `total` = coût prestataire (ce qu'on paye). `revenue` = CA client HT (ce
+      // qu'on facture). La marge se déduit (revenue - total).
+      type Bucket = { id: string; name: string; total: number; revenue: number; count: number };
+      const byPrestaBucket = (id: string, name: string) => ({ id, name, total: 0, count: 0 });
       const byClient = new Map<string, Bucket>();
-      const byPresta = new Map<string, Bucket>();
+      const byPresta = new Map<string, ReturnType<typeof byPrestaBucket>>();
       let grandTotal = 0;
+      let grandRevenue = 0;
 
       for (const r of rows) {
         const base = Number(r.provider_price ?? 0);
@@ -717,14 +732,22 @@ export default fp(
         const subtotal = base + laundry;
         grandTotal += subtotal;
 
-        // by_client
+        // CA client HT (ménage + blanchisserie refacturée si incluse).
+        const clientBase = Number(r.client_price_ht ?? 0);
+        const clientLaundry = r.laundry_included ? Number(r.laundry_client_price_ht ?? 0) : 0;
+        const revenue = clientBase + clientLaundry;
+        grandRevenue += revenue;
+
+        // by_client (coût + CA)
         const clientKey = r.client_id ?? '__no_client__';
         const clientName =
           r.client_company_name ||
           [r.client_first_name, r.client_last_name].filter(Boolean).join(' ') ||
           'Sans client';
-        const cb = byClient.get(clientKey) ?? { id: clientKey, name: clientName, total: 0, count: 0 };
+        const cb =
+          byClient.get(clientKey) ?? { id: clientKey, name: clientName, total: 0, revenue: 0, count: 0 };
         cb.total += subtotal;
+        cb.revenue += revenue;
         cb.count += 1;
         byClient.set(clientKey, cb);
 
@@ -746,14 +769,22 @@ export default fp(
 
       const round = (n: number) => Number(n.toFixed(2));
       return {
+        // total = coût prestataire (à payer) ; revenue = CA client HT ; margin = CA - coût.
         total: round(grandTotal),
+        revenue: round(grandRevenue),
+        margin: round(grandRevenue - grandTotal),
         currency: 'EUR',
         count: rows.length,
         from: opts.from ?? null,
         to: opts.to ?? null,
         by_client: Array.from(byClient.values())
-          .map((b) => ({ ...b, total: round(b.total) }))
-          .sort((a, b) => b.total - a.total),
+          .map((b) => ({
+            ...b,
+            total: round(b.total),
+            revenue: round(b.revenue),
+            margin: round(b.revenue - b.total),
+          }))
+          .sort((a, b) => b.revenue - a.revenue),
         by_prestataire: Array.from(byPresta.values())
           .map((b) => ({ ...b, total: round(b.total), count: round(b.count) }))
           .sort((a, b) => b.total - a.total),

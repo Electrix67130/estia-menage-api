@@ -315,7 +315,7 @@ Chaque ménage sérialisé (liste **et** détail) inclut un booléen calculé **
 | POST | `/menages/:id/validate` | Validation rapport — body `{ price?: number }` |
 | GET | `/me/earnings?from=&to=&validated_only=` | Bilan gains du prestataire connecté. Inclut les ménages où il est référent **ou** affecté via `menage_prestataire` (multi-affectation, remplacement ponctuel). |
 | GET | `/users/:user_id/earnings?from=&to=&validated_only=` | Bilan gains d'un prestataire (admin only). |
-| GET | `/admin/earnings?from=&to=&validated_only=` | Vue globale admin : total org + breakdown **`by_client`** + **`by_prestataire`**. Pour le breakdown presta, le `provider_price` d'un ménage multi-affecté est réparti à parts égales entre les prestas assignés (le total reconcilie avec `by_client`). |
+| GET | `/admin/earnings?from=&to=&validated_only=` | Vue globale admin : **`total`** (coût à payer) + **`revenue`** (CA client HT) + **`margin`** + breakdown **`by_client`** (total/revenue/margin) + **`by_prestataire`** (coût). Pour le breakdown presta, le `provider_price` d'un ménage multi-affecté est réparti à parts égales entre les prestas assignés (le total reconcilie avec `by_client`). |
 
 ### Modèles de checklist (org)
 
@@ -345,6 +345,8 @@ Filtre `closed` : `closed=true` = uniquement les ménages clôturés (`valide`/`
       "id": "uuid",
       "date_prevue": "2026-05-15",
       "logement_id": "uuid",
+      "logement_name": "Studio Nice",
+      "prestation_type": "menage",
       "status": "valide",
       "provider_price": "50.00",
       "laundry_provider_price": "8.00",
@@ -355,18 +357,21 @@ Filtre `closed` : `closed=true` = uniquement les ménages clôturés (`valide`/`
   ]
 }
 ```
+(`/users/:user_id/earnings` a la même forme — sert au **récap détaillé d'un prestataire** dans le dashboard : `logement_name` + `prestation_type` par ligne.)
 
 `GET /admin/earnings` réponse :
 ```json
 {
   "total": 1860.00,
+  "revenue": 2480.00,
+  "margin": 620.00,
   "currency": "EUR",
   "count": 24,
   "from": "2026-05-01",
   "to": "2026-05-31",
   "by_client": [
-    { "id": "uuid", "name": "Eiffage SAS", "total": 920.00, "count": 12 },
-    { "id": "__no_client__", "name": "Sans client", "total": 80.00, "count": 1 }
+    { "id": "uuid", "name": "Eiffage SAS", "total": 920.00, "revenue": 1200.00, "margin": 280.00, "count": 12 },
+    { "id": "__no_client__", "name": "Sans client", "total": 80.00, "revenue": 100.00, "margin": 20.00, "count": 1 }
   ],
   "by_prestataire": [
     { "id": "uuid", "name": "Marie Dupont", "total": 720.00, "count": 10 },
@@ -374,7 +379,9 @@ Filtre `closed` : `closed=true` = uniquement les ménages clôturés (`valide`/`
   ]
 }
 ```
-(`by_prestataire.count` peut être fractionnaire si certains ménages sont multi-prestas et donc partagés.)
+- `total` = coût prestataire (**à payer**) ; `revenue` = CA client HT (**ce qu'on facture**) ; `margin` = `revenue - total`.
+- `by_client` porte `total`/`revenue`/`margin` par client.
+- `by_prestataire.count` peut être fractionnaire si certains ménages sont multi-prestas et donc partagés.
 
 `POST /menages` body :
 ```json
