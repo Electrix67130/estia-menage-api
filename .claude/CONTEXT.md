@@ -15,7 +15,9 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 |---|---|---|---|---|
 | **API** | `estia-menage-api` | Fastify + Knex (PostgreSQL) + Zod + TS | tag git `[0-9]*` → CI SSH → VPS (docker build + `npm run migrate`) | dernier tag **0.1.42** · `api.estia-clean-connect.fr` |
 | **Dashboard** (admin web) | `estia-menage-dashboard` | Next.js (App Router) | tag git `[0-9]*` → CI SSH → VPS | dernier tag **0.1.62** |
-| **Mobile** (presta + admin) | `estia-menage-ui` | Expo SDK 54 + EAS | **OTA** `eas update --branch production` (JS) · build natif = TestFlight | runtime **0.1.0**, TestFlight **0.1.0 (19)** · bundle `fr.estiacleanconnect.app` |
+| **Mobile** (presta + admin) | `estia-menage-ui` | Expo SDK 54 + EAS | **OTA** `eas update --branch production --environment production` (JS) · build natif = TestFlight | runtime **0.1.0**, TestFlight **0.1.0 (19)** · bundle `fr.estiacleanconnect.app` |
+
+> ⚠️ **OTA mobile — toujours `--environment production`.** Sans ce flag, `eas update` inline le `.env` **local** (`EXPO_PUBLIC_API_URL`/`_API_KEY` = localhost) dans le bundle prod → l'app pointe vers l'API locale et le login casse. Les vraies valeurs sont dans les variables d'env EAS (environment `production`).
 
 **Parité** : toute feature doit être déclinée dashboard **et** mobile quand elle concerne les deux (sauf facturation/gains = dashboard-only).
 
