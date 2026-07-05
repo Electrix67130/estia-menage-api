@@ -16,6 +16,7 @@ export type RealtimeEventType =
   | 'menage.arrival'
   | 'menage.departure'
   | 'menage.validated'
+  | 'menage.declaration'
   | 'menage-check-item.toggled';
 
 export interface RealtimeEvent {

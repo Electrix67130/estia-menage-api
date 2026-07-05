@@ -115,6 +115,28 @@ export const arrivalSchema = pointageSchema.extend({
     .optional(),
 });
 
+/**
+ * Édition a posteriori de la déclaration voyageurs (note + dégradation) par le
+ * prestataire assigné ou un admin, sans re-pointer. Tous les champs optionnels.
+ */
+export const updateDeclarationSchema = z.object({
+  traveler_rating: z.number().int().min(1).max(5).optional(),
+  has_degradation: z.boolean().optional(),
+  degradation_note: z.string().max(5000).optional(),
+  degradation_photos: z
+    .array(
+      z.object({
+        url: z.string().url().max(1000),
+        thumbnail_url: z.string().url().max(1000).optional(),
+        file_size: z.coerce.number().int().positive().optional(),
+        mime_type: z.string().max(100).optional(),
+      }),
+    )
+    .max(20)
+    .optional(),
+});
+export type UpdateDeclaration = z.infer<typeof updateDeclarationSchema>;
+
 export const listMenagesSchema = z.object({
   status: menageStatusEnum.optional(),
   /** Filtre par type de prestation (dashboard : menus séparés check-in/out). */

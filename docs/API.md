@@ -312,6 +312,7 @@ Chaque ménage sérialisé (liste **et** détail) inclut un booléen calculé **
 | DELETE | `/menages/:id` | Suppression (admin) |
 | POST | `/menages/:id/arrival` | Pointage arrivée (prestataire assigné) — body `{ photo_url, lat, lng, traveler_rating?, has_degradation?, degradation_note?, degradation_photos? }`. Photo géolocalisée obligatoire. `traveler_rating` 1-5. Si `has_degradation`, `degradation_photos: [{ url, thumbnail_url?, file_size?, mime_type? }]` est enregistré dans `photo` avec `is_degradation=true`. Nouveaux champs optionnels (rétro-compat). |
 | POST | `/menages/:id/departure` | Pointage départ (prestataire assigné) — body `{ photo_url, lat, lng }` |
+| PUT | `/menages/:id/declaration` | Éditer la déclaration voyageurs **après coup** (prestataire assigné ou admin, permission `edit`) — body `{ traveler_rating?, has_degradation?, degradation_note?, degradation_photos? }`. Tous optionnels ; les photos s'ajoutent à la galerie (`is_degradation=true`). Sert à (re)mettre la note/dégradation sans re-pointer. |
 | POST | `/menages/:id/validate` | Validation rapport — body `{ price?: number }` |
 | GET | `/me/earnings?from=&to=&validated_only=` | Bilan gains du prestataire connecté. Inclut les ménages où il est référent **ou** affecté via `menage_prestataire` (multi-affectation, remplacement ponctuel). |
 | GET | `/users/:user_id/earnings?from=&to=&validated_only=` | Bilan gains d'un prestataire (admin only). |

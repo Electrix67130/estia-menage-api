@@ -219,6 +219,52 @@ class MenageService extends BaseService<MenageRow> {
     });
   }
 
+  /**
+   * Met à jour la déclaration voyageurs (note + dégradation) après coup, sans
+   * re-pointer. Champs optionnels ; les photos de dégradation sont ajoutées à
+   * la galerie (taguées `is_degradation`).
+   */
+  async updateDeclaration(
+    id: string,
+    fields: {
+      travelerRating?: number;
+      hasDegradation?: boolean;
+      degradationNote?: string;
+      degradationPhotos?: {
+        url: string;
+        thumbnail_url?: string;
+        file_size?: number;
+        mime_type?: string;
+      }[];
+    },
+    userId: string,
+  ): Promise<MenageRow | undefined> {
+    const now = new Date();
+    return this.db.transaction(async (trx) => {
+      const update: Record<string, unknown> = { updated_at: now };
+      if (fields.travelerRating !== undefined) update.traveler_rating = fields.travelerRating;
+      if (fields.hasDegradation !== undefined) update.has_degradation = fields.hasDegradation;
+      if (fields.degradationNote !== undefined) update.degradation_note = fields.degradationNote;
+      const [row] = (await trx('menage').where({ id }).update(update).returning('*')) as MenageRow[];
+
+      if (fields.degradationPhotos?.length) {
+        await trx('photo').insert(
+          fields.degradationPhotos.map((p) => ({
+            menage_id: id,
+            uploaded_by: userId,
+            url: p.url,
+            thumbnail_url: p.thumbnail_url ?? null,
+            mime_type: p.mime_type ?? null,
+            file_size: p.file_size ?? null,
+            taken_at: now,
+            is_degradation: true,
+          })),
+        );
+      }
+      return row;
+    });
+  }
+
   async recordDeparture(
     id: string,
     proof: { photoUrl?: string; lat?: number; lng?: number },

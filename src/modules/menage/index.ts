@@ -9,6 +9,7 @@ import {
   pointageSchema,
   arrivalSchema,
   checkPointageSchema,
+  updateDeclarationSchema,
   listMenagesSchema,
   serializeMenageForRole,
 } from './menage.schema';
@@ -427,6 +428,37 @@ export default fp(
         notifyMenageArrival(fastify.db, id, request.user.sub).catch((err) =>
           fastify.log.error({ err }, 'push arrival failed'),
         );
+        return signFields(updated as Record<string, unknown>, ['arrival_photo_url', 'departure_photo_url']);
+      },
+    );
+
+    // PUT /menages/:id/declaration — éditer la note voyageurs + dégradation
+    // après coup (prestataire assigné ou admin), sans re-pointer.
+    fastify.put(
+      '/menages/:id/declaration',
+      { preHandler: [fastify.authenticate] },
+      async (request, reply) => {
+        const { id } = uuidSchema.parse(request.params);
+        const existing = await service.findById(id);
+        if (!existing) return reply.notFound('Menage not found');
+        await requirePermissionForMenage(fastify.db, request.user.sub, id, 'edit');
+        const { traveler_rating, has_degradation, degradation_note, degradation_photos } =
+          updateDeclarationSchema.parse(request.body);
+        const updated = await service.updateDeclaration(
+          id,
+          {
+            travelerRating: traveler_rating,
+            hasDegradation: has_degradation,
+            degradationNote: degradation_note,
+            degradationPhotos: degradation_photos,
+          },
+          request.user.sub,
+        );
+        emitToMenage(fastify.db, id, {
+          type: 'menage.declaration',
+          menage_id: id,
+          actor_id: request.user.sub,
+        }).catch((err) => fastify.log.error({ err }, 'WS emit failed'));
         return signFields(updated as Record<string, unknown>, ['arrival_photo_url', 'departure_photo_url']);
       },
     );
