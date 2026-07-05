@@ -43,6 +43,8 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 - **Facturation** (dashboard, admin) : factures/devis regroupant les ménages par client+période, PDF, export CSV, statuts, numérotation légale ; récap « à payer prestataires ».
 - **Gains** (dashboard, admin) : par semaine/mois/année/tout → **CA client (HT)** · **à payer (coût presta)** · **marge** ; ventilation par client et par prestataire ; clic presta → détail de ses prestations ; bouton **« Facturer »** (deep-link vers création de facture pré-remplie).
 - **Archivage logement en cascade** : archive le logement + toutes ses prestations + ses consommables (confirmation explicite).
+- **Détail prestation (mobile)** : adresse du logement (tap → Maps) + galerie photos des pièces (vignette + visionneuse swipeable façon Photos iOS via `react-native-image-viewing`). Les photos de pièces = `/photos` liées à `logement_room_id` (ajoutées côté dashboard).
+- **Profil mobile** : pied de page « version + provenance du bundle (build natif / OTA + date) » pour vérifier qu'une OTA est bien appliquée.
 
 ## Règles métier notables
 
