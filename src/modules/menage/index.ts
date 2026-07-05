@@ -87,7 +87,16 @@ export default fp(
         return reply.notFound('Menage not found');
       }
       const isAdmin = membership.role === 'admin';
-      const isPrestataire = menage.prestataire_user_id === request.user.sub;
+      // Prestataire du ménage = référent (`prestataire_user_id`) OU affecté via
+      // `menage_prestataire` (multi-presta / remplacement). Un presta secondaire
+      // n'est pas forcément membre du logement, d'où le check dédié.
+      const isReferent = menage.prestataire_user_id === request.user.sub;
+      const isCoPrestataire =
+        !isReferent &&
+        !!(await fastify.db('menage_prestataire')
+          .where({ menage_id: id, user_id: request.user.sub })
+          .first());
+      const isPrestataire = isReferent || isCoPrestataire;
       if (!isAdmin && !isPrestataire) {
         await requirePermissionForLogement(
           fastify.db,
