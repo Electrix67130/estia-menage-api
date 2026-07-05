@@ -57,6 +57,8 @@ class LogementConsommableService extends BaseService<LogementConsommableRow> {
     return result.rows.map((r) => ({
       ...r,
       qty: r.qty === null ? null : Number(r.qty),
+      // Pour la liste logement, le stock courant EST le dernier relevé (= qty).
+      current_qty: r.qty === null ? null : Number(r.qty),
       needs_restock: r.qty !== null && Number(r.qty) <= r.seuil_alerte,
     }));
   }
@@ -94,32 +96,40 @@ class LogementConsommableService extends BaseService<LogementConsommableRow> {
     menageId: string,
     logementId: string,
   ): Promise<MenageConsommableLine[]> {
-    const rows = (await this.db('logement_consommable as c')
-      .leftJoin('menage_consommable_releve as r', function () {
-        this.on('r.logement_consommable_id', '=', 'c.id').andOnVal('r.menage_id', '=', menageId);
-      })
-      .where('c.logement_id', logementId)
-      .whereNull('c.archived_at')
-      .orderBy('c.position', 'asc')
-      .orderBy('c.label', 'asc')
-      .select(
-        'c.id as logement_consommable_id',
-        'c.label',
-        'c.unit',
-        'c.seuil_alerte',
-        'c.position',
-        'r.qty',
-      )) as Array<{
-      logement_consommable_id: string;
-      label: string;
-      unit: string | null;
-      seuil_alerte: number;
-      position: number;
-      qty: number | null;
-    }>;
-    return rows.map((r) => ({
+    // `qty` = relevé de CE ménage ; `current_qty` = dernier relevé tous ménages
+    // confondus (stock courant), pour pré-remplir l'input côté mobile.
+    const result = (await this.db.raw(
+      `SELECT c.id as logement_consommable_id, c.label, c.unit, c.seuil_alerte, c.position,
+              mr.qty as qty,
+              latest.qty as current_qty
+       FROM logement_consommable c
+       LEFT JOIN menage_consommable_releve mr
+         ON mr.logement_consommable_id = c.id AND mr.menage_id = ?
+       LEFT JOIN LATERAL (
+         SELECT r.qty
+         FROM menage_consommable_releve r
+         WHERE r.logement_consommable_id = c.id
+         ORDER BY r.recorded_at DESC
+         LIMIT 1
+       ) latest ON true
+       WHERE c.logement_id = ? AND c.archived_at IS NULL
+       ORDER BY c.position ASC, c.label ASC`,
+      [menageId, logementId],
+    )) as {
+      rows: Array<{
+        logement_consommable_id: string;
+        label: string;
+        unit: string | null;
+        seuil_alerte: number;
+        position: number;
+        qty: number | null;
+        current_qty: number | null;
+      }>;
+    };
+    return result.rows.map((r) => ({
       ...r,
       qty: r.qty === null ? null : Number(r.qty),
+      current_qty: r.current_qty === null ? null : Number(r.current_qty),
       needs_restock: r.qty !== null && Number(r.qty) <= r.seuil_alerte,
     }));
   }

@@ -70,6 +70,8 @@ export type MenageConsommableLine = {
   unit: string | null;
   seuil_alerte: number;
   position: number;
-  qty: number | null;
+  qty: number | null; // relevé de CE ménage (null si pas encore saisi)
+  /** Stock courant = dernier relevé tous ménages confondus (pour pré-remplir). */
+  current_qty: number | null;
   needs_restock: boolean; // qty != null && qty <= seuil_alerte
 };

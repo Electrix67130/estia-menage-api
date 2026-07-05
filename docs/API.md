@@ -790,7 +790,7 @@ Liste de consommables par logement (config admin) + relevé de quantité restant
 | PATCH | `/logement-consommables/:id` | Modifie la config (admin) — `label/unit/seuil_alerte/position` |
 | PUT | `/logement-consommables/:id/stock` | **Fixe/initialise le stock courant** (admin) — body `{ qty }`. Crée un relevé manuel (`menage_id` NULL) qui devient le stock courant. Ne déclenche pas la notif de seuil. |
 | DELETE | `/logement-consommables/:id` | Soft-delete via `archived_at` (admin) — préserve l'historique |
-| GET | `/menages/:id/consommables` | Liste du logement + quantité relevée pour CE ménage (`qty` null si non saisi) |
+| GET | `/menages/:id/consommables` | Liste du logement + `qty` (relevé de CE ménage, null si non saisi) + `current_qty` (stock courant = dernier relevé tous ménages, pour pré-remplir l'input) |
 | PUT | `/menages/:id/consommables` | Relevé au pointage de fin — body `{ items: [{ logement_consommable_id, qty }] }` (prestataire assigné ou admin) |
 
 Chaque **logement** sérialisé (liste + détail) inclut `consommables_alert` (nombre de consommables sous le seuil) → badge « à racheter » côté dashboard/mobile.
