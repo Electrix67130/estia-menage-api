@@ -36,7 +36,7 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 - **Prestations** ménage / check-in / check-out, avec **tag de type coloré** (Ménage=bleu, Check-in=vert, Check-out=rouge) partout : listes, détail, cards calendrier, dashboard.
 - **Sync iCal** (Airbnb…) : chaque réservation génère un ménage + (si toggles `enable_check_in`/`enable_check_out` du logement) une prestation check-in/out. Dédup par `external_event_uid` + `prestation_type`.
 - **Checklist** par logement (modèles réutilisables).
-- **Photos + commentaires** par prestation ; **pointage** arrivée/départ ; **validation** du rapport par l'admin.
+- **Photos + commentaires** par prestation ; **pointage** arrivée/départ ; **validation** du rapport par l'admin. La **déclaration voyageurs** (note 1-5 + dégradation) est saisie au pointage d'arrivée **et** ré-éditable après coup (`PUT /menages/:id/declaration`, presta assigné ou admin) — mobile + dashboard.
 - **Demandes de report** (reschedule) presta → admin.
 - **Notifications push** (Expo) + **emails brandés** ; **rappels programmés** (veille 18h, 2h avant).
 - **Consommables** par logement + alertes sous seuil.
