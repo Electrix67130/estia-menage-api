@@ -11,7 +11,7 @@ const BRAND = '#2563EB';
 
 function logoUrl(): string {
   // `?v=2` = cache-bust : les clients mail (Gmail proxy) cachent l'image par URL.
-  return `${env.APP_URL}/assets/logo-estia.png?v=2`;
+  return `${env.APP_URL}/assets/logo-estia.png?v=3`;
 }
 
 function shell(opts: {
@@ -111,6 +111,7 @@ export function renderResetPasswordPage(token: string): string {
   </div>
   <script>
     var token = ${JSON.stringify(token)};
+    var dashLogin = ${JSON.stringify(`${env.DASHBOARD_URL}/login?reset=1`)};
     var f = document.getElementById('f'), m = document.getElementById('m'), b = document.getElementById('b');
     f.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -127,7 +128,8 @@ export function renderResetPasswordPage(token: string): string {
           if (res.ok) {
             f.style.display = 'none';
             m.className = 'msg ok';
-            m.textContent = 'Mot de passe réinitialisé ! Vous pouvez retourner sur l\\'application ou le dashboard pour vous connecter.';
+            m.textContent = 'Mot de passe modifié ! Redirection vers la connexion…';
+            setTimeout(function () { window.location.href = dashLogin; }, 1400);
           } else {
             b.disabled = false; b.textContent = 'Réinitialiser';
             m.className = 'msg err';

@@ -19,6 +19,8 @@ const envSchema = z.object({
   SMTP_PASSWORD: z.string().default(''),
   SMTP_FROM: z.string().default('noreply@estiamenage.fr'),
   APP_URL: z.string().default('http://localhost:3001'),
+  /** URL du dashboard web (pour rediriger après reset de mot de passe, etc.). */
+  DASHBOARD_URL: z.string().default('https://app.estia-clean-connect.fr'),
   STORAGE_MODE: z.enum(['local', 's3']).default('local'),
   S3_ENDPOINT: z.string().default(''),
   S3_BUCKET: z.string().default(''),
