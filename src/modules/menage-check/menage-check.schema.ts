@@ -68,6 +68,7 @@ export type MenageCheckSectionRow = {
   menage_id: string;
   section_type: SectionType;
   section_label: string;
+  icon: string | null;
   position: number;
   created_at: string;
   updated_at: string;

@@ -234,8 +234,8 @@ Checklist paramétrable par logement (utilisée à la création d'un ménage à 
 | Méthode | Endpoint | Description |
 |---|---|---|
 | GET | `/logement-check-templates?logement_id=` | Tree complet (sections + items) |
-| POST | `/logement-check-template-sections` | Crée une section (admin) |
-| PATCH | `/logement-check-template-sections/:id` | Modifie une section (admin) |
+| POST | `/logement-check-template-sections` | Crée une section (admin) — `{ logement_id, label, icon?, ... }` ; `icon` = emoji optionnel (null = aucune), reporté sur la checklist générée |
+| PATCH | `/logement-check-template-sections/:id` | Modifie une section (admin) — `label?`, `icon?` (null = retirer l'icône) |
 | DELETE | `/logement-check-template-sections/:id` | Supprime une section (admin) |
 | POST | `/logement-check-templates/:logement_id/reorder-sections` | Réordonne — body `{ ordered_ids: [...] }` |
 | POST | `/logement-check-template-items` | Crée un item (admin) |

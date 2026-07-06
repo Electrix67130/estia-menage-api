@@ -5,12 +5,15 @@ export const createTemplateSectionSchema = z.object({
   logement_id: z.string().uuid(),
   logement_room_id: z.string().uuid().optional(),
   label: z.string().min(1).max(200),
+  // Icône emoji optionnelle (null = aucune).
+  icon: z.string().max(16).nullable().optional(),
   position: z.number().int().min(0).optional(),
 });
 
 export const updateTemplateSectionSchema = z.object({
   logement_room_id: z.string().uuid().nullable().optional(),
   label: z.string().min(1).max(200).optional(),
+  icon: z.string().max(16).nullable().optional(),
   position: z.number().int().min(0).optional(),
 });
 
@@ -46,6 +49,7 @@ export type LogementCheckTemplateSectionRow = {
   logement_id: string;
   logement_room_id: string | null;
   label: string;
+  icon: string | null;
   position: number;
   created_at: string;
   updated_at: string;

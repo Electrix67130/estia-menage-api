@@ -104,7 +104,7 @@ export async function generateChecklistForMenage(
 ): Promise<void> {
   const templateSections = (await trx('logement_check_template_section')
     .where({ logement_id: logement.id })
-    .orderBy('position', 'asc')) as Array<{ id: string; label: string }>;
+    .orderBy('position', 'asc')) as Array<{ id: string; label: string; icon: string | null }>;
 
   if (templateSections.length > 0) {
     // Path 1 : template personnalisé du logement
@@ -115,6 +115,7 @@ export async function generateChecklistForMenage(
           menage_id: menageId,
           section_type: 'general',
           section_label: tpl.label,
+          icon: tpl.icon ?? null,
           position: i,
         })
         .returning('*')) as MenageCheckSectionRow[];
