@@ -84,6 +84,9 @@ export function renderResetPasswordPage(token: string): string {
     p.intro { color: #475569; line-height: 1.6; font-size: 15px; margin: 0 0 20px; text-align: center; }
     label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin: 14px 0 6px; }
     input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 10px; font-size: 16px; background: #F8FAFC; }
+    .pw { position: relative; }
+    .pw input { padding-right: 46px; }
+    .eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: auto; margin: 0; padding: 8px; background: none; border: 0; color: #64748B; cursor: pointer; display: flex; }
     button { width: 100%; margin-top: 20px; background: ${BRAND}; color: #FFF; border: 0; padding: 14px; border-radius: 10px; font-weight: 600; font-size: 16px; cursor: pointer; }
     button:disabled { opacity: .6; }
     .msg { margin-top: 16px; font-size: 14px; text-align: center; }
@@ -100,9 +103,15 @@ export function renderResetPasswordPage(token: string): string {
       <p class="intro">Choisissez un nouveau mot de passe (12 caractères minimum).</p>
       <form id="f">
         <label for="p1">Nouveau mot de passe</label>
-        <input id="p1" type="password" autocomplete="new-password" required minlength="12">
+        <div class="pw">
+          <input id="p1" type="password" autocomplete="new-password" required minlength="12">
+          <button type="button" class="eye" data-t="p1" aria-label="Afficher le mot de passe"></button>
+        </div>
         <label for="p2">Confirmer le mot de passe</label>
-        <input id="p2" type="password" autocomplete="new-password" required minlength="12">
+        <div class="pw">
+          <input id="p2" type="password" autocomplete="new-password" required minlength="12">
+          <button type="button" class="eye" data-t="p2" aria-label="Afficher le mot de passe"></button>
+        </div>
         <button id="b" type="submit">Réinitialiser</button>
       </form>
       <div id="m" class="msg"></div>
@@ -113,6 +122,18 @@ export function renderResetPasswordPage(token: string): string {
     var token = ${JSON.stringify(token)};
     var dashLogin = ${JSON.stringify(`${env.DASHBOARD_URL}/login?reset=1`)};
     var f = document.getElementById('f'), m = document.getElementById('m'), b = document.getElementById('b');
+    // Œil afficher/masquer sur les champs mot de passe.
+    var EYE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    var EYE_OFF = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>';
+    Array.prototype.forEach.call(document.querySelectorAll('.eye'), function (btn) {
+      btn.innerHTML = EYE;
+      btn.addEventListener('click', function () {
+        var inp = document.getElementById(btn.getAttribute('data-t'));
+        var show = inp.type === 'password';
+        inp.type = show ? 'text' : 'password';
+        btn.innerHTML = show ? EYE_OFF : EYE;
+      });
+    });
     f.addEventListener('submit', function (e) {
       e.preventDefault();
       var p1 = document.getElementById('p1').value, p2 = document.getElementById('p2').value;
