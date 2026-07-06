@@ -13,8 +13,8 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 
 | App | Repo | Stack | Déploiement | État |
 |---|---|---|---|---|
-| **API** | `estia-menage-api` | Fastify + Knex (PostgreSQL) + Zod + TS | tag git `[0-9]*` → CI SSH → VPS (docker build + `npm run migrate`) | dernier tag **0.1.42** · `api.estia-clean-connect.fr` |
-| **Dashboard** (admin web) | `estia-menage-dashboard` | Next.js (App Router) | tag git `[0-9]*` → CI SSH → VPS | dernier tag **0.1.62** |
+| **API** | `estia-menage-api` | Fastify + Knex (PostgreSQL) + Zod + TS | tag git `[0-9]*` → CI SSH → VPS (docker build + `npm run migrate`) | dernier tag **0.1.53** · `api.estia-clean-connect.fr` |
+| **Dashboard** (admin web) | `estia-menage-dashboard` | Next.js (App Router) | tag git `[0-9]*` → CI SSH → VPS | dernier tag **0.1.66** |
 | **Mobile** (presta + admin) | `estia-menage-ui` | Expo SDK 54 + EAS | **OTA** `eas update --branch production --environment production` (JS) · build natif = TestFlight | runtime **0.1.0**, TestFlight **0.1.0 (19)** · bundle `fr.estiacleanconnect.app` |
 
 > ⚠️ **OTA mobile — toujours `--environment production`.** Sans ce flag, `eas update` inline le `.env` **local** (`EXPO_PUBLIC_API_URL`/`_API_KEY` = localhost) dans le bundle prod → l'app pointe vers l'API locale et le login casse. Les vraies valeurs sont dans les variables d'env EAS (environment `production`).
@@ -35,7 +35,9 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 
 - **Prestations** ménage / check-in / check-out, avec **tag de type coloré** (Ménage=bleu, Check-in=vert, Check-out=rouge) partout : listes, détail, cards calendrier, dashboard.
 - **Sync iCal** (Airbnb…) : chaque réservation génère un ménage + (si toggles `enable_check_in`/`enable_check_out` du logement) une prestation check-in/out. Dédup par `external_event_uid` + `prestation_type`.
-- **Checklist** par logement (modèles réutilisables).
+- **Checklist** par logement (modèles réutilisables). Chaque section a une **icône emoji** optionnelle (palette + « aucune ») choisie dans l'éditeur de template (mobile + dashboard), reportée sur la checklist générée.
+- **Création manuelle** d'une prestation (mobile, FAB admin) : sélecteur de type ; formulaire adapté (check-in/out = heure unique, pas de durée/linge).
+- **Filtre « Non assigné »** dans le filtre prestataire (mobile + dashboard) pour lister les prestations sans prestataire. Détail : tous les prestataires affectés (multi-presta) sont affichés.
 - **Photos + commentaires** par prestation ; **pointage** arrivée/départ ; **validation** du rapport par l'admin. La **déclaration voyageurs** (note 1-5 + dégradation) est saisie au pointage d'arrivée **et** ré-éditable après coup (`PUT /menages/:id/declaration`, presta assigné ou admin) — mobile + dashboard.
 - **Demandes de report** (reschedule) presta → admin.
 - **Notifications push** (Expo) + **emails brandés** ; **rappels programmés** (veille 18h, 2h avant).
