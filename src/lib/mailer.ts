@@ -47,7 +47,7 @@ export function buildBrandedEmail(params: {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background: #F7FAFC;">
       <div style="text-align: center; margin-bottom: 28px;">
-        <img src="${env.APP_URL}/assets/logo-estia.png" alt="Estia Clean Connect" height="72" style="height: 72px; width: auto;">
+        <img src="${env.APP_URL}/assets/logo-estia.png?v=2" alt="Estia Clean Connect" height="72" style="height: 72px; width: auto;">
       </div>
 
       <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 28px;">

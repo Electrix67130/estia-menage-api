@@ -10,7 +10,8 @@ import env from '@/config/env';
 const BRAND = '#2563EB';
 
 function logoUrl(): string {
-  return `${env.APP_URL}/assets/logo-estia.png`;
+  // `?v=2` = cache-bust : les clients mail (Gmail proxy) cachent l'image par URL.
+  return `${env.APP_URL}/assets/logo-estia.png?v=2`;
 }
 
 function shell(opts: {
