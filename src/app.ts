@@ -30,6 +30,9 @@ function buildApp(opts: AppOptions = {}) {
     logger: {
       level: logLevel || 'info',
     },
+    // Les tokens (reset password, invitation) passés en paramètre d'URL font
+    // ~200 caractères ; la limite Fastify par défaut (100) les fait 404.
+    maxParamLength: 500,
     ...fastifyOpts,
   });
 
