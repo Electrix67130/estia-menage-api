@@ -2,7 +2,9 @@ import fp from 'fastify-plugin';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import env from '@/config/env';
 
-const PUBLIC_ROUTES = ['/health', '/privacy', '/support'];
+// `/auth/reset-password` est public : gardé par le token de réinitialisation
+// (signé + expirable), il est appelé depuis la page web de reset (sans API key).
+const PUBLIC_ROUTES = ['/health', '/privacy', '/support', '/auth/reset-password'];
 const PUBLIC_PREFIXES = [
   '/files/',
   '/calendar/ical/',

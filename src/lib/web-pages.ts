@@ -66,13 +66,80 @@ export function renderInvitePage(token: string): string {
 }
 
 export function renderResetPasswordPage(token: string): string {
-  return shell({
-    title: 'Reinitialisation du mot de passe — Estia Clean Connect',
-    heading: 'Reinitialiser votre mot de passe',
-    intro: "Ouvrez l'application Estia Clean Connect pour choisir un nouveau mot de passe.",
-    deepLink: `estia-clean-connect://reset-password/${token}`,
-    buttonLabel: 'Choisir un nouveau mot de passe',
-  });
+  // Formulaire web autonome : fonctionne partout (mobile ET desktop/dashboard),
+  // sans dépendre de l'app installée. POST direct vers /auth/reset-password.
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Réinitialisation du mot de passe — Estia Clean Connect</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F7FAFC; color: #0F172A; }
+    .wrap { max-width: 460px; margin: 0 auto; padding: 48px 24px; text-align: center; }
+    img.logo { height: 88px; width: auto; margin-bottom: 24px; }
+    .card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 32px 24px; text-align: left; }
+    h1 { font-size: 22px; margin: 0 0 8px; color: #0F172A; text-align: center; }
+    p.intro { color: #475569; line-height: 1.6; font-size: 15px; margin: 0 0 20px; text-align: center; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin: 14px 0 6px; }
+    input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 10px; font-size: 16px; background: #F8FAFC; }
+    button { width: 100%; margin-top: 20px; background: ${BRAND}; color: #FFF; border: 0; padding: 14px; border-radius: 10px; font-weight: 600; font-size: 16px; cursor: pointer; }
+    button:disabled { opacity: .6; }
+    .msg { margin-top: 16px; font-size: 14px; text-align: center; }
+    .err { color: #E11D48; }
+    .ok { color: #059669; }
+    .muted { color: #94A3B8; font-size: 13px; margin-top: 24px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="logo" src="${logoUrl()}" alt="Estia Clean Connect">
+    <div class="card">
+      <h1>Réinitialiser votre mot de passe</h1>
+      <p class="intro">Choisissez un nouveau mot de passe (12 caractères minimum).</p>
+      <form id="f">
+        <label for="p1">Nouveau mot de passe</label>
+        <input id="p1" type="password" autocomplete="new-password" required minlength="12">
+        <label for="p2">Confirmer le mot de passe</label>
+        <input id="p2" type="password" autocomplete="new-password" required minlength="12">
+        <button id="b" type="submit">Réinitialiser</button>
+      </form>
+      <div id="m" class="msg"></div>
+    </div>
+    <p class="muted">Estia Clean Connect — Gestion de prestations de ménage</p>
+  </div>
+  <script>
+    var token = ${JSON.stringify(token)};
+    var f = document.getElementById('f'), m = document.getElementById('m'), b = document.getElementById('b');
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var p1 = document.getElementById('p1').value, p2 = document.getElementById('p2').value;
+      m.className = 'msg';
+      if (p1.length < 12) { m.className = 'msg err'; m.textContent = 'Le mot de passe doit faire au moins 12 caractères.'; return; }
+      if (p1 !== p2) { m.className = 'msg err'; m.textContent = 'Les deux mots de passe ne correspondent pas.'; return; }
+      b.disabled = true; b.textContent = 'Réinitialisation…';
+      fetch(${JSON.stringify(env.APP_URL)} + '/auth/reset-password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token, new_password: p1 })
+      }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+          if (res.ok) {
+            f.style.display = 'none';
+            m.className = 'msg ok';
+            m.textContent = 'Mot de passe réinitialisé ! Vous pouvez retourner sur l\\'application ou le dashboard pour vous connecter.';
+          } else {
+            b.disabled = false; b.textContent = 'Réinitialiser';
+            m.className = 'msg err';
+            m.textContent = (res.d && res.d.message) || 'Lien invalide ou expiré. Refaites une demande de réinitialisation.';
+          }
+        }).catch(function () {
+          b.disabled = false; b.textContent = 'Réinitialiser';
+          m.className = 'msg err'; m.textContent = 'Erreur réseau. Réessayez.';
+        });
+    });
+  </script>
+</body>
+</html>`;
 }
 
 const CONTACT_EMAIL = 'contact@estiaconciergerie.fr';
