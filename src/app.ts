@@ -90,14 +90,18 @@ function buildApp(opts: AppOptions = {}) {
   // Health check
   app.get('/health', async () => ({ status: 'ok' }));
 
-  // Pages web publiques (pont email -> app mobile via deep link)
+  // Pages web publiques (email). Ces pages ont du JS inline (formulaire de reset,
+  // redirection) que la CSP par défaut d'helmet (`script-src 'self'`) bloque —
+  // on pose donc une CSP dédiée autorisant l'inline sur ces routes HTML.
+  const htmlPageCsp =
+    "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'self'";
   app.get('/invite/:token', async (request, reply) => {
     const { token } = request.params as { token: string };
-    reply.type('text/html').send(renderInvitePage(token));
+    reply.header('Content-Security-Policy', htmlPageCsp).type('text/html').send(renderInvitePage(token));
   });
   app.get('/reset-password/:token', async (request, reply) => {
     const { token } = request.params as { token: string };
-    reply.type('text/html').send(renderResetPasswordPage(token));
+    reply.header('Content-Security-Policy', htmlPageCsp).type('text/html').send(renderResetPasswordPage(token));
   });
 
   // Pages legales publiques (referencees dans la fiche App Store)
