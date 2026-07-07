@@ -47,6 +47,7 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 - **Archivage logement en cascade** : archive le logement + toutes ses prestations + ses consommables (confirmation explicite).
 - **Détail prestation (mobile)** : adresse du logement (tap → Maps) + galerie photos des pièces (vignette + visionneuse swipeable façon Photos iOS via `react-native-image-viewing`). Les photos de pièces = `/photos` liées à `logement_room_id` (ajoutées côté dashboard).
 - **Profil mobile** : pied de page « version + provenance du bundle (build natif / OTA + date) » pour vérifier qu'une OTA est bien appliquée.
+- **Cache offline (mobile, lecture seule)** : le cache React Query est persisté sur AsyncStorage (rétention 24 h, seules les requêtes réussies, `buster` de version dans `src/lib/persist.ts` à incrémenter pour purger après un breaking change de schéma). Réhydraté au démarrage → les prestations/checklists déjà consultées s'affichent hors connexion. Détection réseau 100 % JS (`src/lib/network.ts` : probe `fetch` + `AppState` sur `onlineManager`) → pause/reprise auto + `refetchOnReconnect`, **livrable en OTA** (pas de module natif). **Bandeau « Mode hors ligne »**. Les **mutations** sont en `networkMode: 'always'` → une action tentée hors ligne **échoue immédiatement** (pas de rejeu différé). Cache **purgé au logout**.
 
 ## Règles métier notables
 
