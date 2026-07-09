@@ -62,8 +62,12 @@ class MenageViewService extends BaseService<MenageViewRow> {
     organizationId: string,
     isAdmin: boolean,
   ): Promise<UnreadSummary> {
-    const menageIds = await this.getVisibleMenageIds(userId, organizationId, isAdmin);
-    if (menageIds.length === 0) return { by_menage: {}, by_organization: {} };
+    const menages = await this.getVisibleMenages(userId, organizationId, isAdmin);
+    if (menages.length === 0) {
+      return { by_menage: {}, by_organization: {}, by_type: {} };
+    }
+    const menageIds = menages.map((m) => m.id);
+    const typeById = new Map(menages.map((m) => [m.id, m.prestation_type]));
 
     const [cGen, cStep, cPhoto] = await Promise.all([
       this.countComments(userId, menageIds, 'general', 'comments'),
@@ -72,26 +76,37 @@ class MenageViewService extends BaseService<MenageViewRow> {
     ]);
 
     const by_menage: Record<string, number> = {};
+    // Ventilé par type de prestation → chaque item de nav a son propre badge
+    // (le badge « Ménages » n'est plus pollué par les check-in/check-out).
+    const by_type: Record<string, number> = {};
     for (const id of menageIds) {
       const total = (cGen.get(id) ?? 0) + (cStep.get(id) ?? 0) + (cPhoto.get(id) ?? 0);
-      if (total > 0) by_menage[id] = total;
+      if (total > 0) {
+        by_menage[id] = total;
+        const type = typeById.get(id) ?? 'menage';
+        by_type[type] = (by_type[type] ?? 0) + total;
+      }
     }
     const orgTotal = Object.values(by_menage).reduce((a, b) => a + b, 0);
     const by_organization = orgTotal > 0 ? { [organizationId]: orgTotal } : {};
-    return { by_menage, by_organization };
+    return { by_menage, by_organization, by_type };
   }
 
   /** Ménages visibles : tous (admin) ou affectés/membre (prestataire). */
-  private async getVisibleMenageIds(
+  private async getVisibleMenages(
     userId: string,
     organizationId: string,
     isAdmin: boolean,
-  ): Promise<string[]> {
+  ): Promise<{ id: string; prestation_type: string }[]> {
     const db = this.db;
     const query = db('menage')
       .where('menage.organization_id', organizationId)
       .whereNull('menage.archived_at')
-      .select('menage.id');
+      // Exclut les prestations clôturées (validé/annulé) : elles vivent dans les
+      // Archives, pas dans la worklist. Ainsi chaque badge correspond à une
+      // ligne réellement visible dans la liste active (cohérence badge ↔ liste).
+      .whereNotIn('menage.status', ['valide', 'annule'])
+      .select('menage.id', 'menage.prestation_type');
 
     if (!isAdmin) {
       query.where(function () {
@@ -111,8 +126,7 @@ class MenageViewService extends BaseService<MenageViewRow> {
       });
     }
 
-    const rows = (await query) as { id: string }[];
-    return rows.map((r) => r.id);
+    return (await query) as { id: string; prestation_type: string }[];
   }
 
   /** Compte les commentaires non lus par ménage (généraux ou d'étapes). */

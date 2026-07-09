@@ -60,4 +60,7 @@ export type UnreadCounts = {
 export type UnreadSummary = {
   by_menage: Record<string, number>;
   by_organization: Record<string, number>;
+  /** Total des non-lus ventilé par type de prestation (menage / check_in /
+   * check_out) → chaque item de nav affiche son propre badge. */
+  by_type: Record<string, number>;
 };

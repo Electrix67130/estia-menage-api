@@ -802,7 +802,7 @@ Suivi des consultations par utilisateur pour afficher les badges de non-lus côt
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/menage-views/unread-summary` | Totaux : `{ by_menage: {id: n}, by_organization: {id: n} }` (scopé aux ménages visibles) |
+| GET | `/menage-views/unread-summary` | Totaux : `{ by_menage: {id: n}, by_organization: {id: n}, by_type: {menage: n, check_in: n, check_out: n} }` — scopé aux prestations visibles **non clôturées** (statut ≠ valide/annule). `by_type` sert aux badges de nav par type. |
 | GET | `/menage-views/unread?menage_id=` | Compteurs détaillés d'un ménage (par onglet + `unread_step_ids`, `unread_emergency_ids`, `comments_last_viewed_at`). `comments_last_viewed_at` = dernière lecture de l'onglet discussion (null si jamais) → le client marque chaque commentaire postérieur comme non lu |
 | POST | `/menage-views` | Marque un onglet comme lu — body `{ menage_id, tab }` → 204 |
 | POST | `/menage-views/item` | Marque un item étape/urgence comme lu — body `{ item_type, item_id }` → 204 (no-op pour l'instant) |
