@@ -53,10 +53,14 @@ export default fp(
         });
       }
       const restrictToMember = membership.role !== 'admin' ? request.user.sub : undefined;
+      // ?archived=true → vue « logements archivés » (admin only, pour restaurer).
+      const onlyArchived =
+        (request.query as { archived?: string }).archived === 'true' && membership.role === 'admin';
       const result = await service.findActiveByOrg(
         membership.organization_id,
         pagination,
         restrictToMember,
+        onlyArchived,
       );
       // Flag "consommables à racheter" : nb de consommables sous le seuil
       // (stock courant), par logement.
@@ -244,6 +248,25 @@ export default fp(
       }
       const { archivedMenages } = await service.archive(id);
       return reply.code(200).send({ archived_menages: archivedMenages });
+    });
+
+    // POST /logements/:id/unarchive — restaure un logement archivé (cascade inverse), admin only
+    fastify.post('/logements/:id/unarchive', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+      const { id } = uuidSchema.parse(request.params);
+      const membership = await getActiveMembership(fastify.db, request.user.sub);
+      const existing = await service.findById(id);
+      if (!existing || existing.organization_id !== membership?.organization_id) {
+        return reply.notFound('Logement not found');
+      }
+      if (membership?.role !== 'admin') {
+        return reply.code(403).send({
+          statusCode: 403,
+          error: 'Forbidden',
+          message: 'Admin only',
+        });
+      }
+      const { unarchivedMenages } = await service.unarchive(id);
+      return reply.code(200).send({ unarchived_menages: unarchivedMenages });
     });
 
     done();

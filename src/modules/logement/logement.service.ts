@@ -16,12 +16,16 @@ class LogementService extends BaseService<LogementRow> {
     organizationId: string,
     options: PaginationOptions = {},
     restrictToMemberUserId?: string,
+    onlyArchived = false,
   ): Promise<PaginatedResult<LogementRow>> {
     const { page = 1, limit = 20, orderBy = 'created_at', order = 'desc' } = options;
 
     const baseQuery = this.db('logement')
-      .where({ 'logement.organization_id': organizationId })
-      .whereNull('logement.archived_at');
+      .where({ 'logement.organization_id': organizationId });
+    // Par défaut : logements actifs. onlyArchived = vue « logements archivés »
+    // (pour les retrouver et les restaurer).
+    if (onlyArchived) baseQuery.whereNotNull('logement.archived_at');
+    else baseQuery.whereNull('logement.archived_at');
 
     if (restrictToMemberUserId) {
       baseQuery.whereExists(function () {
@@ -83,6 +87,41 @@ class LogementService extends BaseService<LogementRow> {
         .update({ archived_at: now, updated_at: now });
 
       return { logement, archivedMenages };
+    });
+  }
+
+  /**
+   * Désarchive un logement **en cascade inverse** : on ne restaure que ce qui a
+   * été archivé PAR LA MÊME cascade (même `archived_at` que le logement), pour
+   * ne pas ressusciter des prestations/consommables archivés autrement.
+   * Retourne le logement restauré + le nombre de prestations restaurées.
+   */
+  async unarchive(
+    id: string,
+  ): Promise<{ logement: LogementRow | undefined; unarchivedMenages: number }> {
+    return this.db.transaction(async (trx) => {
+      const current = (await trx('logement').where({ id }).first()) as LogementRow | undefined;
+      if (!current || !current.archived_at) {
+        // Introuvable ou déjà actif → rien à faire.
+        return { logement: current, unarchivedMenages: 0 };
+      }
+      const cascadeStamp = current.archived_at;
+      const now = new Date();
+
+      const [logement] = (await trx('logement')
+        .where({ id })
+        .update({ archived_at: null, updated_at: now })
+        .returning('*')) as LogementRow[];
+
+      const unarchivedMenages = await trx('menage')
+        .where({ logement_id: id, archived_at: cascadeStamp })
+        .update({ archived_at: null, updated_at: now });
+
+      await trx('logement_consommable')
+        .where({ logement_id: id, archived_at: cascadeStamp })
+        .update({ archived_at: null, updated_at: now });
+
+      return { logement, unarchivedMenages };
     });
   }
 }

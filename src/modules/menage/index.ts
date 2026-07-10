@@ -550,7 +550,9 @@ export default fp(
       const query = fastify.db('menage')
         .leftJoin('logement', 'menage.logement_id', 'logement.id')
         .where('menage.organization_id', organizationId)
-        .whereNull('menage.archived_at')
+        // NB : on ne filtre PAS archived_at ici. Un ménage réalisé (terminé/validé)
+        // doit rester dans l'historique financier même si son logement est archivé
+        // plus tard — sinon archiver un logement effacerait des gains déjà gagnés.
         .where(function () {
           this.where('menage.prestataire_user_id', userId).orWhereExists(function () {
             this.select('*')
@@ -698,8 +700,9 @@ export default fp(
       const q = fastify.db('menage')
         .leftJoin('logement', 'menage.logement_id', 'logement.id')
         .leftJoin('client', 'logement.client_id', 'client.id')
-        .where('menage.organization_id', organizationId)
-        .whereNull('menage.archived_at');
+        .where('menage.organization_id', organizationId);
+      // Idem computeEarningsFor : pas de filtre archived_at, l'historique
+      // financier des ménages réalisés survit à l'archivage du logement.
 
       if (opts.validated_only) q.whereNotNull('menage.validated_at');
       else q.whereIn('menage.status', ['termine', 'valide']);

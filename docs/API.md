@@ -126,11 +126,12 @@ Bien locatif paramétrable. Source des paramètres de génération de checklist.
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/logements` | Liste paginée des logements de l'org (admin : tous ; non-admin : uniquement les logements où il est `logement_member`) |
+| GET | `/logements` | Liste paginée des logements **actifs** de l'org (admin : tous ; non-admin : uniquement les logements où il est `logement_member`). Param `?archived=true` (admin) → liste les logements **archivés** (pour restauration). |
 | GET | `/logements/:id` | Détail (admin OK ; non-admin doit être membre du logement, sinon 404) |
 | POST | `/logements` | Création (admin) — auto-génère les `logement_room` selon les counts |
 | PATCH | `/logements/:id` | Mise à jour (admin) — si les counts augmentent, ajoute les `logement_room` manquantes (idempotent) |
 | DELETE | `/logements/:id` | Archivage en cascade (soft delete, admin) — archive le logement + **toutes ses prestations** (ménages/check-in/check-out) + ses consommables, en transaction. Réponse `200 { archived_menages: number }` |
+| POST | `/logements/:id/unarchive` | Désarchivage en cascade inverse (admin) — restaure le logement + uniquement ce qui a été archivé par la même cascade (même `archived_at`). Réponse `200 { unarchived_menages: number }` |
 
 `POST /logements` body :
 ```json
