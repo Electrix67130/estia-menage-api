@@ -392,8 +392,33 @@ export default fp(
         fastify.log.error({ err }, 'push cancelled (delete) failed'),
       );
 
+      // Prestation AUTO (sync iCal) : on ne hard-delete pas, sinon la sync la
+      // recréerait au prochain pull tant que la réservation existe dans le feed.
+      // On la « retire » = annulée + sync_ignored → tombstone que la sync ne
+      // ré-active/recrée plus (GC automatique une fois passée + hors feed).
+      if (existing.external_source) {
+        await service.update(id, { status: 'annule', sync_ignored: true });
+        return reply.code(200).send({ soft: true, sync_ignored: true });
+      }
+
+      // Prestation manuelle : suppression définitive (rien ne la recrée).
       await service.delete(id);
       return reply.code(204).send();
+    });
+
+    // POST /menages/:id/restore — « remettre » une prestation auto retirée, admin only
+    fastify.post('/menages/:id/restore', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+      const { id } = uuidSchema.parse(request.params);
+      const existing = await service.findById(id);
+      if (!existing) return reply.notFound('Menage not found');
+      const membership = await getActiveMembership(fastify.db, request.user.sub);
+      if (membership?.role !== 'admin' || existing.organization_id !== membership.organization_id) {
+        return reply.code(403).send({ statusCode: 403, error: 'Forbidden', message: 'Admin only' });
+      }
+      // Réactive : enlève l'ignore + repasse en « à venir ». La sync reprendra
+      // ensuite le pilotage normal (date, annulation si résa disparue, etc.).
+      await service.update(id, { status: 'a_venir', sync_ignored: false });
+      return reply.code(200).send({ restored: true });
     });
 
     // POST /menages/:id/arrival — prestataire assigné uniquement

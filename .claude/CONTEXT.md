@@ -13,7 +13,7 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 
 | App | Repo | Stack | Déploiement | État |
 |---|---|---|---|---|
-| **API** | `estia-menage-api` | Fastify + Knex (PostgreSQL) + Zod + TS | tag git `[0-9]*` → CI SSH → VPS (docker build + `npm run migrate`) | dernier tag **0.1.55** · `api.estia-clean-connect.fr` |
+| **API** | `estia-menage-api` | Fastify + Knex (PostgreSQL) + Zod + TS | tag git `[0-9]*` → CI SSH → VPS (docker build + `npm run migrate`) | dernier tag **0.1.56** · `api.estia-clean-connect.fr` |
 | **Dashboard** (admin web) | `estia-menage-dashboard` | Next.js (App Router) | tag git `[0-9]*` → CI SSH → VPS | dernier tag **0.1.71** |
 | **Mobile** (presta + admin) | `estia-menage-ui` | Expo SDK 54 + EAS | **OTA** `eas update --branch production --environment production` (JS) · build natif = TestFlight | runtime **0.1.0**, TestFlight **0.1.0 (19)** · bundle `fr.estiacleanconnect.app` |
 
@@ -34,7 +34,7 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 ## Fonctionnalités clés
 
 - **Prestations** ménage / check-in / check-out, avec **tag de type coloré** (Ménage=bleu, Check-in=vert, Check-out=rouge) partout : listes, détail, cards calendrier, dashboard.
-- **Sync iCal** (Airbnb…) : chaque réservation génère un ménage + (si toggles `enable_check_in`/`enable_check_out` du logement) une prestation check-in/out. Dédup par `external_event_uid` + `prestation_type`.
+- **Sync iCal** (Airbnb…) : chaque réservation génère un ménage + (si toggles `enable_check_in`/`enable_check_out` du logement) une prestation check-in/out. Dédup par `external_event_uid` + `prestation_type`. **Retirer une presta auto** : la supprimer la marque `sync_ignored` + `annulé` (pas de hard delete, sinon la sync la recrée) → elle ne réapparaît plus au pull ; **« Remettre »** depuis le détail (dashboard). GC hard delete auto une fois **passée + disparue du feed**. Presta **manuelle** = hard delete définitif.
 - **Checklist** par logement (modèles réutilisables). Chaque section a une **icône emoji** optionnelle (palette + « aucune ») choisie dans l'éditeur de template (mobile + dashboard), reportée sur la checklist générée.
 - **Création manuelle** d'une prestation (mobile, FAB admin) : sélecteur de type ; formulaire adapté (check-in/out = heure unique, pas de durée/linge).
 - **Filtre « Non assigné »** dans le filtre prestataire (mobile + dashboard) pour lister les prestations sans prestataire. Détail : tous les prestataires affectés (multi-presta) sont affichés.

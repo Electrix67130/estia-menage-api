@@ -114,7 +114,7 @@ class LogementExternalCalendarService {
     const externalSource = `cal_${cal.provider}`;
     const existing = (await this.db('menage')
       .where({ external_calendar_id: cal.id })
-      .select('id', 'external_event_uid', 'prestation_type', 'date_prevue', 'status', 'date_locked', 'next_checkin_at', 'stay_nights')) as Array<{
+      .select('id', 'external_event_uid', 'prestation_type', 'date_prevue', 'status', 'date_locked', 'next_checkin_at', 'stay_nights', 'sync_ignored')) as Array<{
       id: string;
       external_event_uid: string;
       prestation_type: 'menage' | 'check_in' | 'check_out';
@@ -123,6 +123,7 @@ class LogementExternalCalendarService {
       date_locked: boolean;
       next_checkin_at: string | Date | null;
       stay_nights: number | null;
+      sync_ignored: boolean;
     }>;
     // Une réservation (UID) peut désormais matérialiser jusqu'à 3 prestations
     // (ménage + check-in + check-out) → clé d'unicité composite `uid:type`.
@@ -193,6 +194,9 @@ class LogementExternalCalendarService {
         const isMenageType = t.type === 'menage';
         const prev = existingByKey.get(key);
         if (prev) {
+          // Prestation « retirée » par l'admin : on la laisse en tombstone, la
+          // sync ne la ré-active/reschedule JAMAIS (elle a été retirée exprès).
+          if (prev.sync_ignored) continue;
           // UPDATE — si la date a changé OU si la prestation avait été annulée,
           // on la ré-active à la nouvelle date. `date_prevue` peut revenir en
           // `Date` (colonne `date` parsée par node-pg) → normalisation locale.
@@ -267,6 +271,17 @@ class LogementExternalCalendarService {
         .update({ status: 'annule', updated_at: new Date() });
       cancelledMenageIds.push(prev.id);
       result.cancelled_menages++;
+    }
+
+    // GC — prestations « retirées » (sync_ignored) devenues obsolètes : date
+    // passée ET disparues du feed → aucun risque de recréation, on nettoie en
+    // dur (elles n'ont jamais été réalisées, aucune valeur historique).
+    const todayYmd = ymd(new Date());
+    for (const prev of existing) {
+      if (!prev.sync_ignored) continue;
+      if (seenKeys.has(keyOf(prev.external_event_uid, prev.prestation_type))) continue; // encore dans le feed
+      if (ymd(prev.date_prevue) >= todayYmd) continue; // pas encore passée
+      await this.db('menage').where({ id: prev.id }).del();
     }
 
     await this.markSync(cal.id, null);

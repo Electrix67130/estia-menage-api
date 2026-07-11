@@ -221,7 +221,12 @@ export type MenageRow = {
   validated_by: string | null;
   validated_price: number | string | null;
   notes_intervention: string | null;
+  /** Source externe si créée par sync iCal (airbnb/booking/…), null si manuelle. */
+  external_source: string | null;
+  external_event_uid: string | null;
   archived_at: string | null;
+  /** true = prestation auto « retirée » : la sync iCal ne la recrée/ré-active plus. */
+  sync_ignored: boolean;
   created_at: string;
   updated_at: string;
   /** Joined fields from `user` table on prestataire_user_id (populated by findActive) */

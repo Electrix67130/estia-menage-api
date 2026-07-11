@@ -143,6 +143,7 @@ Prestation de ménage datée.
 | n_travelers | int | nb de voyageurs (saisi admin ; dimensionne les « lits à faire ») |
 | notes_intervention | text | |
 | archived_at | timestamp | |
+| sync_ignored | boolean notnull default false | presta auto « retirée » par l'admin → la sync iCal ne la recrée/ré-active plus (tombstone) ; GC hard delete une fois passée + hors feed |
 | created_at, updated_at | timestamp | |
 
 INDEX : `(logement_id, date_prevue)`, `(prestataire_user_id, status)`, `(organization_id, status)`, `(organization_id, prestation_type, status)`.
