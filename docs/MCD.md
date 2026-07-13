@@ -13,6 +13,7 @@ Base : **PostgreSQL 17** · ORM : **Knex 3** · IDs : `uuid` (default `uuid()`).
 | first_name, last_name | varchar(100) notnull | |
 | phone | varchar(20) | |
 | avatar_url | varchar(500) | |
+| avatar_thumbnail_url | varchar(500) | Miniature (~400px) de l'avatar, générée à l'upload (affichée dans les listes) |
 | role | enum `user_role` notnull default `prestataire` | `admin`, `prestataire` |
 | company_name | varchar(200) | Entreprise de l'organisation (propagée à tous les membres par un admin) |
 | provider_company | varchar(200) nullable | Entreprise propre du prestataire (perso, éditable par lui-même, non propagée) |
@@ -100,6 +101,7 @@ Bien locatif paramétrable.
 | notes | text | |
 | key_safe_code | varchar(50) | code de boîte à clef (saisi par l'admin, visible aux membres du logement) ; UI masque le contenu avec un eye toggle |
 | cover_photo_url | varchar(500) | URL d'une photo de couverture du logement (uploadée via flow `/upload`) |
+| cover_photo_thumbnail_url | varchar(500) | Miniature (~400px) de la couverture, générée à l'upload (affichée dans les listes/cards) |
 | color | varchar(9) | code hex `#RRGGBB` utilisé pour différencier les ménages du logement dans les vues calendrier (mobile + dashboard) |
 | archived_at | timestamp | soft delete |
 | created_at, updated_at | timestamp | |

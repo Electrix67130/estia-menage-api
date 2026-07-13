@@ -77,7 +77,7 @@ export async function getMenageRecipientIds(
 ): Promise<string[]> {
   const menage = await db('menage')
     .where({ id: menageId })
-    .select('organization_id', 'created_by', 'logement_id')
+    .select('organization_id', 'created_by', 'logement_id', 'prestataire_user_id')
     .first();
   if (!menage) return [];
 
@@ -92,9 +92,22 @@ export async function getMenageRecipientIds(
     .select('user_id')) as { user_id: string }[];
   for (const a of admins) userIds.add(a.user_id);
 
-  // Membres du logement parent (prestataires, responsables, client…).
+  // Prestataires AFFECTÉS à cette prestation : référent + co-prestataires. Un
+  // presta n'est notifié que pour SES prestations — être simple membre
+  // `prestataire` du logement ne suffit pas (sinon une photo/un commentaire posé
+  // par un autre presta sur SA prestation notifiait tout le monde).
+  if (menage.prestataire_user_id) userIds.add(menage.prestataire_user_id);
+  const coPrestataires = (await db('menage_prestataire')
+    .where({ menage_id: menageId })
+    .select('user_id')) as { user_id: string }[];
+  for (const p of coPrestataires) userIds.add(p.user_id);
+
+  // Membres superviseurs / propriétaires du logement : managers (supervision) et
+  // client_proprietaire (suivi de son bien) sont notifiés sur tout le logement.
+  // Les membres de rôle `prestataire` NON affectés en sont exclus.
   const members = (await db('logement_member')
     .where({ logement_id: menage.logement_id })
+    .whereIn('role', ['manager', 'client_proprietaire'])
     .select('user_id')) as { user_id: string }[];
   for (const m of members) userIds.add(m.user_id);
 

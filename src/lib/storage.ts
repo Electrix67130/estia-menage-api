@@ -26,6 +26,8 @@ export interface Storage {
   upload(storedName: string, stream: Readable, contentType: string): Promise<UploadResult>;
   /** Vrai si l'objet existe. */
   exists(storedName: string): Promise<boolean>;
+  /** Lit l'objet complet en mémoire (usage : générer une miniature). */
+  read(storedName: string): Promise<Buffer>;
   /** URL présignée de téléchargement (mode s3 uniquement). */
   presignedUrl(storedName: string, expiresInSeconds?: number): Promise<string>;
 }
@@ -62,6 +64,10 @@ class LocalStorage implements Storage {
 
   async exists(storedName: string): Promise<boolean> {
     return fs.existsSync(path.join(UPLOAD_DIR, storedName));
+  }
+
+  async read(storedName: string): Promise<Buffer> {
+    return fs.promises.readFile(path.join(UPLOAD_DIR, storedName));
   }
 
   async presignedUrl(): Promise<string> {
@@ -127,6 +133,18 @@ class S3Storage implements Storage {
     } catch {
       return false;
     }
+  }
+
+  async read(storedName: string): Promise<Buffer> {
+    const { client, clientS3 } = await this.sdk();
+    const res = await client.send(
+      new clientS3.GetObjectCommand({ Bucket: env.S3_BUCKET, Key: storedName }),
+    );
+    const chunks: Buffer[] = [];
+    for await (const chunk of res.Body as Readable) {
+      chunks.push(chunk as Buffer);
+    }
+    return Buffer.concat(chunks);
   }
 
   async presignedUrl(storedName: string, expiresInSeconds = 300): Promise<string> {

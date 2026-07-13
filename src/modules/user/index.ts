@@ -24,7 +24,7 @@ const paginationSchema = z.object({
 const uuidSchema = z.object({ id: z.string().uuid() });
 
 // Fields that any user can update on their own profile
-const SELF_EDITABLE_FIELDS = ['first_name', 'last_name', 'email', 'phone', 'avatar_url'] as const;
+const SELF_EDITABLE_FIELDS = ['first_name', 'last_name', 'email', 'phone', 'avatar_url', 'avatar_thumbnail_url'] as const;
 // Fields reserved to admins (role, is_active, company_name)
 const ADMIN_ONLY_FIELDS = ['role', 'is_active', 'company_name'] as const;
 
@@ -61,7 +61,7 @@ export default fp(
       const user = await service.findById(id);
       if (!user) return reply.notFound('User not found');
       const { password_hash: _, ...safeUser } = user;
-      return signFields(safeUser, ['avatar_url']);
+      return signFields(safeUser, ['avatar_url', 'avatar_thumbnail_url']);
     });
 
     // PATCH /users/:id — self update OR admin for role/is_active

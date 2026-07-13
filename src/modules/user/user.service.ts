@@ -10,6 +10,7 @@ const USER_PUBLIC_COLS = [
   'user.last_name',
   'user.phone',
   'user.avatar_url',
+  'user.avatar_thumbnail_url',
   'user.company_name',
   'user.is_active',
   'user.created_at',
@@ -54,7 +55,7 @@ class UserService extends BaseService<UserRow> {
       .offset((page - 1) * limit);
 
     return {
-      data: signUrlsInList(data, ['avatar_url']),
+      data: signUrlsInList(data, ['avatar_url', 'avatar_thumbnail_url']),
       meta: { total: parseInt(count, 10), page, limit, totalPages: Math.ceil(parseInt(count, 10) / limit) },
     };
   }
@@ -95,7 +96,7 @@ class UserService extends BaseService<UserRow> {
       .offset((page - 1) * limit);
 
     return {
-      data: signUrlsInList(data, ['avatar_url']),
+      data: signUrlsInList(data, ['avatar_url', 'avatar_thumbnail_url']),
       meta: { total: parseInt(count, 10), page, limit, totalPages: Math.ceil(parseInt(count, 10) / limit) },
     };
   }
@@ -137,7 +138,7 @@ class UserService extends BaseService<UserRow> {
       .offset((page - 1) * limit);
 
     return {
-      data: signUrlsInList(data, ['avatar_url']),
+      data: signUrlsInList(data, ['avatar_url', 'avatar_thumbnail_url']),
       meta: { total: parseInt(count, 10), page, limit, totalPages: Math.ceil(parseInt(count, 10) / limit) },
     };
   }

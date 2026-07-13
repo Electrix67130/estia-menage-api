@@ -109,6 +109,11 @@ class MenageViewService extends BaseService<MenageViewRow> {
       .select('menage.id', 'menage.prestation_type');
 
     if (!isAdmin) {
+      // Un prestataire n'est notifié que pour les prestations où il est AFFECTÉ
+      // (référent OU co-presta). Le simple statut de membre `prestataire` d'un
+      // logement ne suffit pas — sinon une photo/un commentaire posé par un autre
+      // presta sur SA prestation générerait un badge parasite. Seuls les membres
+      // de rôle `manager` (superviseurs) gardent la visibilité sur tout le logement.
       query.where(function () {
         this.where('menage.prestataire_user_id', userId)
           .orWhereExists(function () {
@@ -121,7 +126,8 @@ class MenageViewService extends BaseService<MenageViewRow> {
             this.select(db.raw('1'))
               .from('logement_member as lm')
               .whereRaw('lm.logement_id = menage.logement_id')
-              .where('lm.user_id', userId);
+              .where('lm.user_id', userId)
+              .where('lm.role', 'manager');
           });
       });
     }

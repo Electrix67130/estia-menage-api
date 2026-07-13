@@ -1,13 +1,19 @@
 import fp from 'fastify-plugin';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { randomUUID, createHmac } from 'crypto';
+import { Readable } from 'stream';
 import path from 'path';
 import { z } from 'zod';
 import env from '@/config/env';
 import storage from '@/lib/storage';
-import { optimizeImageStream } from '@/lib/image';
+import { optimizeImageStream, generateThumbnail, isThumbnailable } from '@/lib/image';
 
 const TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Cache long : les fichiers sont content-addressés (nom = UUID) donc immuables.
+// L'accès reste protégé par le token dans l'URL ; une fois téléchargé, le client
+// réutilise sa copie tant que l'URL (stable par fenêtre, cf. sign-url) ne change pas.
+const FILE_CACHE_MAX_AGE = 24 * 60 * 60; // secondes
 
 /** Generate a signed token: filename + expiry, signed with JWT_SECRET */
 function generateFileToken(filename: string): { token: string; expires: number } {
@@ -63,10 +69,17 @@ async function uploadPlugin(fastify: FastifyInstance) {
     // En mode S3, on redirige vers une URL présignée (le téléchargement se fait
     // directement depuis Object Storage). En local, on sert le fichier du disque.
     if (storage.mode === 's3') {
-      return reply.redirect(await storage.presignedUrl(safeName));
+      const presignTtl = FILE_CACHE_MAX_AGE;
+      // Le 302 lui-même est mis en cache un peu moins longtemps que la validité
+      // de l'URL présignée, pour ne jamais rejouer un lien S3 expiré.
+      reply.header('Cache-Control', `private, max-age=${presignTtl - 60}`);
+      return reply.redirect(await storage.presignedUrl(safeName, presignTtl));
     }
 
-    return reply.sendFile(safeName);
+    reply.header('Cache-Control', `private, max-age=${FILE_CACHE_MAX_AGE}, immutable`);
+    // `cacheControl: false` → on laisse @fastify/static ne PAS écraser notre
+    // en-tête (sinon il renverrait son propre Cache-Control par défaut).
+    return reply.sendFile(safeName, { cacheControl: false });
   });
 
   // POST /upload — upload a file (authenticated)
@@ -85,7 +98,8 @@ async function uploadPlugin(fastify: FastifyInstance) {
     }
 
     const ext = path.extname(data.filename) || '';
-    const storedName = `${randomUUID()}${ext}`;
+    const uuid = randomUUID();
+    const storedName = `${uuid}${ext}`;
 
     // Les images sont optimisées à la volée (resize + recompression) avant
     // stockage. Les autres types de fichiers passent tels quels.
@@ -94,8 +108,26 @@ async function uploadPlugin(fastify: FastifyInstance) {
 
     const { size } = await storage.upload(storedName, body, data.mimetype);
 
+    // Miniature (~400px) pour les listes/grilles : on relit l'image déjà
+    // optimisée (≤2000px, donc légère) et on en dérive un JPEG. Best-effort :
+    // un échec ne bloque pas l'upload (thumbnail_url reste undefined → le
+    // front retombe sur l'URL originale).
+    let thumbnailUrl: string | undefined;
+    if (isThumbnailable(data.mimetype)) {
+      try {
+        const original = await storage.read(storedName);
+        const thumb = await generateThumbnail(original);
+        const thumbName = `${uuid}_thumb.jpg`;
+        await storage.upload(thumbName, Readable.from(thumb.buffer), thumb.contentType);
+        thumbnailUrl = `${env.APP_URL}/files/${thumbName}`;
+      } catch (err) {
+        request.log.error({ err }, 'thumbnail generation failed');
+      }
+    }
+
     return reply.code(201).send({
       url: `${env.APP_URL}/files/${storedName}`,
+      thumbnail_url: thumbnailUrl,
       original_name: data.filename,
       file_size: size,
       mime_type: data.mimetype,

@@ -171,6 +171,35 @@ export default fp(
       },
     );
 
+    // PUT /menages/:id/prestataires/:user_id/primary — désigner le référent
+    // parmi les prestataires déjà affectés (admin only). Ne change pas la liste,
+    // seulement lequel est le référent (`menage.prestataire_user_id`).
+    fastify.put(
+      '/menages/:id/prestataires/:user_id/primary',
+      { preHandler: [fastify.authenticate] },
+      async (request, reply) => {
+        const { id, user_id } = menageUserIdParam.parse(request.params);
+        const guard = await ensureAdmin(request.user.sub, id);
+        if (!guard.ok) {
+          return reply.code(guard.code).send({
+            statusCode: guard.code,
+            error: guard.code === 403 ? 'Forbidden' : 'Not Found',
+            message: guard.message,
+          });
+        }
+        const ok = await service.setPrimary(id, user_id);
+        if (!ok) {
+          return reply.code(400).send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: "Ce prestataire n'est pas affecté à ce ménage",
+          });
+        }
+        const data = await service.findByMenage(id);
+        return { data };
+      },
+    );
+
     // DELETE /menages/:id/prestataires/:user_id — remove (admin only)
     fastify.delete(
       '/menages/:id/prestataires/:user_id',

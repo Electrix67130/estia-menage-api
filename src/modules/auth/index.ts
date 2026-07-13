@@ -74,7 +74,7 @@ export default fp(
         : memberships[0];
 
       return {
-        ...signFields(safeUser, ['avatar_url']),
+        ...signFields(safeUser, ['avatar_url', 'avatar_thumbnail_url']),
         role: active?.role ?? null,
         organization_id: active?.organization_id ?? null,
         active_organization_id: user.active_organization_id ?? null,

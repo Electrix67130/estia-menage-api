@@ -5,9 +5,12 @@ import { generateChecklistForMenage } from '@/modules/menage-check/menage-check.
 import { LogementRow } from '@/modules/logement/logement.schema';
 import { signFields, signUrlsInList } from '@/lib/sign-url';
 
-interface FindOptions extends Omit<ListMenagesQuery, 'manager'> {
+interface FindOptions extends Omit<ListMenagesQuery, 'manager' | 'assigned'> {
   managerUserId?: string;
   restrictToMember?: boolean;
+  /** Restreint aux prestations où `managerUserId` est affecté (référent OU
+   *  co-presta via `menage_prestataire`). Utilisé par l'historique presta. */
+  restrictToAssignee?: boolean;
 }
 
 class MenageService extends BaseService<MenageRow> {
@@ -29,6 +32,7 @@ class MenageService extends BaseService<MenageRow> {
         'prestataire.first_name as prestataire_first_name',
         'prestataire.last_name as prestataire_last_name',
         'prestataire.avatar_url as prestataire_avatar_url',
+        'prestataire.avatar_thumbnail_url as prestataire_avatar_thumbnail_url',
         'logement.name as logement_name',
         'logement.address as logement_address',
         'logement.city as logement_city',
@@ -41,7 +45,12 @@ class MenageService extends BaseService<MenageRow> {
         ),
       )) as MenageRow | undefined;
     return row
-      ? signFields(row, ['prestataire_avatar_url', 'arrival_photo_url', 'departure_photo_url'])
+      ? signFields(row, [
+          'prestataire_avatar_url',
+          'prestataire_avatar_thumbnail_url',
+          'arrival_photo_url',
+          'departure_photo_url',
+        ])
       : row;
   }
 
@@ -63,6 +72,7 @@ class MenageService extends BaseService<MenageRow> {
       closed,
       managerUserId,
       restrictToMember,
+      restrictToAssignee,
       from,
       to,
     } = options;
@@ -93,6 +103,16 @@ class MenageService extends BaseService<MenageRow> {
           });
         });
       }
+      if (restrictToAssignee && managerUserId) {
+        qb.where((sub) => {
+          sub.where('menage.prestataire_user_id', managerUserId).orWhereExists(function () {
+            this.select('*')
+              .from('menage_prestataire')
+              .whereRaw('menage_prestataire.menage_id = menage.id')
+              .where('menage_prestataire.user_id', managerUserId);
+          });
+        });
+      }
     };
 
     const countQuery = this.db('menage');
@@ -112,6 +132,7 @@ class MenageService extends BaseService<MenageRow> {
           'prestataire.first_name as prestataire_first_name',
           'prestataire.last_name as prestataire_last_name',
           'prestataire.avatar_url as prestataire_avatar_url',
+          'prestataire.avatar_thumbnail_url as prestataire_avatar_thumbnail_url',
           'logement.name as logement_name',
           'logement.address as logement_address',
           'logement.city as logement_city',
@@ -129,6 +150,7 @@ class MenageService extends BaseService<MenageRow> {
     return {
       data: signUrlsInList(data, [
         'prestataire_avatar_url',
+        'prestataire_avatar_thumbnail_url',
         'arrival_photo_url',
         'departure_photo_url',
       ]),

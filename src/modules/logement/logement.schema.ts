@@ -29,6 +29,7 @@ export const createLogementSchema = z.object({
   client_id: z.string().uuid().optional(),
   key_safe_code: z.string().max(50).optional(),
   cover_photo_url: z.string().url().max(500).optional(),
+  cover_photo_thumbnail_url: z.string().url().max(500).optional(),
   default_duration_min: z.number().int().min(0).max(1440).optional(),
   default_client_price_ht: z.number().min(0).max(100000).optional(),
   default_client_vat_rate: z.number().min(0).max(100).optional(),
@@ -74,6 +75,7 @@ export const updateLogementSchema = z.object({
   client_id: z.string().uuid().nullable().optional(),
   key_safe_code: z.string().max(50).nullable().optional(),
   cover_photo_url: z.string().url().max(500).nullable().optional(),
+  cover_photo_thumbnail_url: z.string().url().max(500).nullable().optional(),
   default_duration_min: z.number().int().min(0).max(1440).nullable().optional(),
   default_client_price_ht: z.number().min(0).max(100000).nullable().optional(),
   default_client_vat_rate: z.number().min(0).max(100).nullable().optional(),
@@ -121,6 +123,7 @@ export type LogementRow = {
   notes: string | null;
   key_safe_code: string | null;
   cover_photo_url: string | null;
+  cover_photo_thumbnail_url: string | null;
   default_duration_min: number | null;
   default_client_price_ht: number | string | null;
   default_client_vat_rate: number | string | null;

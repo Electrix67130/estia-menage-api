@@ -20,8 +20,12 @@ class MenagePrestataireService {
         'user.last_name',
         'user.email',
         'user.avatar_url',
+        'user.avatar_thumbnail_url',
       )) as Omit<MenagePrestataireWithUser, 'is_primary'>[];
-    return rows.map((r, idx) => ({ ...signFields(r, ['avatar_url']), is_primary: idx === 0 }));
+    return rows.map((r, idx) => ({
+      ...signFields(r, ['avatar_url', 'avatar_thumbnail_url']),
+      is_primary: idx === 0,
+    }));
   }
 
   /**
@@ -103,6 +107,38 @@ class MenagePrestataireService {
           .update({ prestataire_user_id: userId, updated_at: new Date() });
       }
       return inserted;
+    });
+  }
+
+  /**
+   * Désigne un prestataire déjà affecté comme référent (primary). Le référent
+   * étant dérivé du plus ancien `created_at`, on repositionne la row choisie
+   * avant toutes les autres, puis on synchronise `menage.prestataire_user_id`.
+   * Retourne `false` si le user n'est pas affecté au ménage.
+   */
+  async setPrimary(menageId: string, userId: string): Promise<boolean> {
+    return this.db.transaction(async (trx) => {
+      const row = (await trx('menage_prestataire')
+        .where({ menage_id: menageId, user_id: userId })
+        .first()) as MenagePrestataireRow | undefined;
+      if (!row) return false;
+
+      // Plus ancien created_at du groupe → on place la row choisie juste avant.
+      const min = (await trx('menage_prestataire')
+        .where({ menage_id: menageId })
+        .min('created_at as m')
+        .first()) as { m: string | Date } | undefined;
+      const minTs = min?.m ? new Date(min.m).getTime() : Date.now();
+      const newCreatedAt = new Date(minTs - 1000);
+
+      await trx('menage_prestataire')
+        .where({ menage_id: menageId, user_id: userId })
+        .update({ created_at: newCreatedAt });
+
+      await trx('menage')
+        .where({ id: menageId })
+        .update({ prestataire_user_id: userId, updated_at: new Date() });
+      return true;
     });
   }
 

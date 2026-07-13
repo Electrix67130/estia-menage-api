@@ -305,7 +305,7 @@ Chaque ménage sérialisé (liste **et** détail) inclut un booléen calculé **
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/menages?status=&type=&prestataire_user_id=&logement_id=&validated=&unassigned=&manager=me&from=&to=` | Liste filtrable. `type` = `menage`\|`check_in`\|`check_out` (défaut : tous types). Chaque ménage inclut un booléen `has_pending_reschedule` (true s'il existe au moins une `menage_reschedule_request` `status='pending'`) — sert à afficher un badge "demande en attente" sur les cards admin. |
+| GET | `/menages?status=&type=&prestataire_user_id=&logement_id=&validated=&unassigned=&manager=me&assigned=me&from=&to=` | Liste filtrable. `type` = `menage`\|`check_in`\|`check_out` (défaut : tous types). Chaque ménage inclut un booléen `has_pending_reschedule` (true s'il existe au moins une `menage_reschedule_request` `status='pending'`) — sert à afficher un badge "demande en attente" sur les cards admin. |
 | GET | `/menages/:id` | Détail (inclut aussi `has_pending_reschedule`). |
 | GET | `/menages/:id/eligible-prestataires` | **Tous** les prestataires de l'org, avec un flag `is_member` (membre prestataire du logement). Les non-membres peuvent être affectés **ponctuellement** (remplacement) — ils ne reçoivent que ce ménage |
 | POST | `/menages` | Création (admin) — **génère auto la checklist**. Accepte `prestation_type` (`menage` par défaut) pour créer un check-in/check-out manuellement. |
@@ -334,6 +334,8 @@ Chaque ménage sérialisé (liste **et** détail) inclut un booléen calculé **
 Filtre `unassigned=true` : ne retourne que les ménages sans prestataire (utile pour le calendrier admin). `unassigned=false` : que les ménages déjà affectés.
 
 Filtre `closed` : `closed=true` = uniquement les ménages clôturés (`valide`/`annule`) → Archives ; `closed=false` = worklist active (exclut `valide`/`annule`). Combinable avec `logement_id`, `prestataire_user_id`, `from`/`to`, pagination.
+
+Filtre `assigned=me` : ne retourne que les prestations où l'utilisateur courant est **affecté** — référent (`prestataire_user_id`) **OU** co-prestataire (`menage_prestataire`). Contrairement au scope par défaut d'un non-admin (référent **ou membre du logement**, qui remonte toutes les prestations des logements dont il est membre), `assigned=me` prime sur ce scope et ne garde que ce que l'utilisateur a réellement fait. Utilisé par l'historique presta (mobile).
 
 `GET /me/earnings` réponse :
 ```json
@@ -448,6 +450,7 @@ Un même ménage peut être affecté à **plusieurs prestataires** via la table 
 | GET | `/menages/:id/prestataires` | Liste des prestataires affectés (enrichis user + `is_primary`) — tout membre de l'org |
 | PUT | `/menages/:id/prestataires` | Full-replace : remplace toute la liste (admin) |
 | POST | `/menages/:id/prestataires/:user_id` | Ajout unitaire (admin) — idempotent |
+| PUT | `/menages/:id/prestataires/:user_id/primary` | Désigne ce prestataire (déjà affecté) comme **référent** (admin) — ne change pas la liste, seulement `is_primary` / `menage.prestataire_user_id`. `400` s'il n'est pas affecté. Retourne la liste enrichie. |
 | DELETE | `/menages/:id/prestataires/:user_id` | Retrait unitaire (admin) — si c'était le référent, le suivant devient référent |
 
 `PUT /menages/:id/prestataires` body :
@@ -739,14 +742,15 @@ L'upload du fichier lui-même passe par `POST /upload` (multipart) qui retourne 
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| POST | `/upload` | Upload multipart (champ fichier). Authentifié. Max 10 Mo. Rate-limit dédié **200/min** (envoi groupé de photos). Images optimisées serveur (resize 2000px, recompression, strip EXIF). |
+| POST | `/upload` | Upload multipart (champ fichier). Authentifié. Max 10 Mo. Rate-limit dédié **200/min** (envoi groupé de photos). Images optimisées serveur (resize 2000px, recompression, strip EXIF). **Renvoie aussi `thumbnail_url`** (miniature JPEG ~400px) pour les images → à stocker à côté de `url` (avatar/cover/photo) et à afficher dans les listes/grilles. |
 | GET | `/files/token/:filename` | Génère une URL de téléchargement signée (token TTL 5 min). Authentifié. |
-| GET | `/files/:filename?t=<token>` | Sert le fichier si le token est valide (pas d'API key requise). |
+| GET | `/files/:filename?t=<token>` | Sert le fichier si le token est valide (pas d'API key requise). **`Cache-Control`** posé (fichiers content-addressés = immuables) → mise en cache client. |
 
 `POST /upload` réponse `201` :
 ```json
 {
   "url": "https://api.estia-clean-connect.fr/files/<uuid>.jpg",
+  "thumbnail_url": "https://api.estia-clean-connect.fr/files/<uuid>_thumb.jpg",
   "original_name": "photo.jpg",
   "file_size": 824513,
   "mime_type": "image/jpeg"
@@ -758,6 +762,18 @@ auto-orienté (EXIF), redimensionné pour tenir dans **2000×2000 px** (sans
 agrandissement), recompressé (qualité ~80, JPEG via mozjpeg) et débarrassé de ses
 métadonnées. `file_size` reflète la taille **après** optimisation. Les fichiers
 non-image sont stockés tels quels.
+
+**Miniature (`thumbnail_url`)** : pour les images, une vignette JPEG (~400px, qualité 70)
+est aussi générée et renvoyée. Best-effort (un échec ne bloque pas l'upload → `thumbnail_url`
+absent). À stocker à côté de `url` (`photo.thumbnail_url`, `user.avatar_thumbnail_url`,
+`logement.cover_photo_thumbnail_url`) et à afficher dans les listes/grilles ; l'original
+(`url`) reste pour le plein écran.
+
+**URLs signées stables (cache)** : le token `?t=` d'une URL `/files` a une expiration
+**arrondie à une fenêtre** (avatar/cover : 24 h ; photos d'intervention : 1 h) au lieu d'un
+TTL glissant. Un même fichier produit donc la **même URL** sur toute la fenêtre → le cache
+client (navigateur, `<Image>` RN, indexés par URL) est réutilisé au lieu de re-télécharger à
+chaque réponse API.
 
 **Stockage** : piloté par `STORAGE_MODE`. En `local`, les fichiers sont sur le
 disque du serveur et servis directement. En `s3` (Scaleway Object Storage),

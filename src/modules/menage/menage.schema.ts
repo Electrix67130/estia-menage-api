@@ -158,6 +158,11 @@ export const listMenagesSchema = z.object({
     .transform((v) => (v === 'true' ? true : v === 'false' ? false : v))
     .optional(),
   manager: z.literal('me').optional(),
+  /** `me` = uniquement les prestations où l'utilisateur est affecté (référent
+   *  `prestataire_user_id` OU co-presta via `menage_prestataire`). Sert à
+   *  l'historique presta : ne voir que les prestations qu'il a réellement faites,
+   *  pas toutes celles des logements dont il est membre. */
+  assigned: z.literal('me').optional(),
   from: z.string().optional(),
   to: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -233,6 +238,7 @@ export type MenageRow = {
   prestataire_first_name?: string | null;
   prestataire_last_name?: string | null;
   prestataire_avatar_url?: string | null;
+  prestataire_avatar_thumbnail_url?: string | null;
   /** Joined fields from `logement` table (populated by findActive / findByIdWithPrestataire) */
   logement_name?: string | null;
   logement_address?: string | null;

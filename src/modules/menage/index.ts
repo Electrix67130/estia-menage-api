@@ -60,11 +60,17 @@ export default fp(
         });
       }
       const isAdmin = membership.role === 'admin';
-      const { manager, ...rest } = query;
+      const { manager, assigned, ...rest } = query;
+      // `assigned=me` : ne voir que les prestations où l'utilisateur est affecté
+      // (référent OU co-presta) — utilisé par l'historique presta. Prime sur le
+      // scope « membre du logement » (qui montrerait toutes les prestas du logement).
+      const restrictToAssignee = assigned === 'me';
       const result = await service.findActive(membership.organization_id, {
         ...rest,
-        managerUserId: manager === 'me' || !isAdmin ? request.user.sub : undefined,
-        restrictToMember: !isAdmin,
+        managerUserId:
+          manager === 'me' || !isAdmin || restrictToAssignee ? request.user.sub : undefined,
+        restrictToMember: !isAdmin && !restrictToAssignee,
+        restrictToAssignee,
       });
       return {
         ...result,

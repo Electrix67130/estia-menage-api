@@ -15,6 +15,42 @@ import { Transform } from 'stream';
 const MAX_DIMENSION = 2000; // px, côté le plus long
 const QUALITY = 80;
 
+/** Côté le plus long d'une miniature (grilles, cards, avatars). */
+const THUMBNAIL_DIMENSION = 400;
+const THUMBNAIL_QUALITY = 70;
+
+/** Formats d'image pour lesquels on sait produire une miniature. */
+export function isThumbnailable(mimetype: string): boolean {
+  return (
+    mimetype === 'image/jpeg' ||
+    mimetype === 'image/jpg' ||
+    mimetype === 'image/png' ||
+    mimetype === 'image/webp'
+  );
+}
+
+/**
+ * Génère une miniature JPEG (~400px) à partir des octets d'une image déjà
+ * optimisée. Utilisée à l'upload pour peupler `thumbnail_url` : les listes et
+ * grilles affichent la vignette (≈20-40 Ko) au lieu de l'original (jusqu'à
+ * 2000px), l'original n'étant chargé que dans la visionneuse plein écran.
+ */
+export async function generateThumbnail(
+  input: Buffer,
+): Promise<{ buffer: Buffer; contentType: string }> {
+  const buffer = await sharp(input, { failOn: 'none' })
+    .rotate()
+    .resize({
+      width: THUMBNAIL_DIMENSION,
+      height: THUMBNAIL_DIMENSION,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: THUMBNAIL_QUALITY, mozjpeg: true })
+    .toBuffer();
+  return { buffer, contentType: 'image/jpeg' };
+}
+
 export function optimizeImageStream(mimetype: string): Transform | null {
   if (!mimetype.startsWith('image/')) {
     return null;

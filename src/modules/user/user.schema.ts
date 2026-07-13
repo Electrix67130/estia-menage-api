@@ -7,6 +7,7 @@ export const createUserSchema = z.object({
   last_name: z.string().min(1).max(100),
   phone: z.string().max(20).optional(),
   avatar_url: z.string().url().max(500).optional(),
+  avatar_thumbnail_url: z.string().url().max(500).optional(),
   role: z.enum(['admin', 'prestataire']).optional().default('prestataire'),
   company_name: z.string().max(200).optional(),
 });
@@ -17,6 +18,7 @@ export const updateUserSchema = z.object({
   last_name: z.string().min(1).max(100).optional(),
   phone: z.string().max(20).optional(),
   avatar_url: z.string().url().max(500).nullable().optional(),
+  avatar_thumbnail_url: z.string().url().max(500).nullable().optional(),
   role: z.enum(['admin', 'prestataire']).optional(),
   company_name: z.string().max(200).optional(),
   /** Entreprise propre du prestataire — éditable par lui-même (non propagée). */
@@ -38,6 +40,7 @@ export type UserRow = {
   last_name: string;
   phone?: string;
   avatar_url?: string | null;
+  avatar_thumbnail_url?: string | null;
   role: 'admin' | 'prestataire';
   company_name?: string;
   provider_company?: string | null;

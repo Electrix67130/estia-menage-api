@@ -71,7 +71,7 @@ export default fp(
       return {
         ...result,
         data: result.data.map((l) => ({
-          ...signFields(l, ['cover_photo_url']),
+          ...signFields(l, ['cover_photo_url', 'cover_photo_thumbnail_url']),
           consommables_alert: alerts.get(l.id) ?? 0,
         })),
       };
@@ -93,7 +93,10 @@ export default fp(
         if (!isMember) return reply.notFound('Logement not found');
       }
       const alerts = await computeConsommableAlerts(fastify.db, [id]);
-      return { ...signFields(logement, ['cover_photo_url']), consommables_alert: alerts.get(id) ?? 0 };
+      return {
+        ...signFields(logement, ['cover_photo_url', 'cover_photo_thumbnail_url']),
+        consommables_alert: alerts.get(id) ?? 0,
+      };
     });
 
     // POST /logements — admin only
