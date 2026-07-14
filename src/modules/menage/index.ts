@@ -6,7 +6,7 @@ import {
   createMenageSchema,
   updateMenageSchema,
   validateReportSchema,
-  pointageSchema,
+  departureSchema,
   arrivalSchema,
   checkPointageSchema,
   updateDeclarationSchema,
@@ -445,10 +445,18 @@ export default fp(
         // Ménage : photo géolocalisée obligatoire. Check-in/check-out : pointage
         // optionnel, sans photo ni GPS.
         const isCheck = existing.prestation_type !== 'menage';
-        const { photo_url, lat, lng, traveler_rating, has_degradation, degradation_note, degradation_photos } =
-          isCheck
-            ? { ...checkPointageSchema.parse(request.body ?? {}), degradation_photos: undefined }
-            : arrivalSchema.parse(request.body);
+        const {
+          photo_url,
+          lat,
+          lng,
+          traveler_rating,
+          has_degradation,
+          degradation_note,
+          degradation_photos,
+          arrived_at,
+        } = isCheck
+          ? { ...checkPointageSchema.parse(request.body ?? {}), degradation_photos: undefined }
+          : arrivalSchema.parse(request.body);
         const updated = await service.recordArrival(
           id,
           { photoUrl: photo_url, lat, lng },
@@ -458,6 +466,7 @@ export default fp(
             hasDegradation: has_degradation,
             degradationNote: degradation_note,
             degradationPhotos: degradation_photos,
+            arrivedAt: arrived_at,
           },
         );
         emitToMenage(fastify.db, id, {
@@ -520,10 +529,14 @@ export default fp(
         }
         // Ménage : photo géolocalisée obligatoire. Check-in/check-out : optionnel.
         const isCheck = existing.prestation_type !== 'menage';
-        const { photo_url, lat, lng } = isCheck
+        const { photo_url, lat, lng, departed_at } = isCheck
           ? checkPointageSchema.parse(request.body ?? {})
-          : pointageSchema.parse(request.body);
-        const updated = await service.recordDeparture(id, { photoUrl: photo_url, lat, lng });
+          : departureSchema.parse(request.body);
+        const updated = await service.recordDeparture(
+          id,
+          { photoUrl: photo_url, lat, lng },
+          departed_at,
+        );
         emitToMenage(fastify.db, id, {
           type: 'menage.departure',
           menage_id: id,

@@ -203,12 +203,17 @@ class MenageService extends BaseService<MenageRow> {
         file_size?: number;
         mime_type?: string;
       }[];
+      /** Horodatage réel du pointage (file d'attente hors ligne). Absent → now. */
+      arrivedAt?: string;
     },
   ): Promise<MenageRow | undefined> {
     const now = new Date();
+    // L'heure d'arrivée est celle du pointage côté client si fournie (un pointage
+    // fait hors ligne a pu attendre le retour du réseau avant d'être envoyé).
+    const arrivedAt = arrival?.arrivedAt ? new Date(arrival.arrivedAt) : now;
     return this.db.transaction(async (trx) => {
       const update: Record<string, unknown> = {
-        arrived_at: now,
+        arrived_at: arrivedAt,
         status: 'en_cours',
         updated_at: now,
       };
@@ -290,11 +295,15 @@ class MenageService extends BaseService<MenageRow> {
   async recordDeparture(
     id: string,
     proof: { photoUrl?: string; lat?: number; lng?: number },
+    /** Horodatage réel du départ (file d'attente hors ligne). Absent → now. */
+    departedAt?: string,
   ): Promise<MenageRow | undefined> {
     const now = new Date();
-    const today = now.toISOString().slice(0, 10);
+    const departed = departedAt ? new Date(departedAt) : now;
+    // Date de réalisation = jour réel du départ (pas le jour de la synchro).
+    const today = departed.toISOString().slice(0, 10);
     const update: Record<string, unknown> = {
-      departed_at: now,
+      departed_at: departed,
       date_realisation: today,
       status: 'termine',
       updated_at: now,

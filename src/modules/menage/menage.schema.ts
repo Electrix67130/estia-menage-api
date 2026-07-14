@@ -95,6 +95,10 @@ export const checkPointageSchema = z.object({
   traveler_rating: z.number().int().min(1).max(5).optional(),
   has_degradation: z.boolean().optional(),
   degradation_note: z.string().max(5000).optional(),
+  // Horodatage réel du pointage, fourni par le client (file d'attente hors
+  // ligne : l'action a pu être faite bien avant l'envoi effectif).
+  arrived_at: z.string().datetime().optional(),
+  departed_at: z.string().datetime().optional(),
 });
 export type CheckPointage = z.infer<typeof checkPointageSchema>;
 
@@ -113,7 +117,17 @@ export const arrivalSchema = pointageSchema.extend({
     )
     .max(20)
     .optional(),
+  // Horodatage réel de l'arrivée (file d'attente hors ligne). Absent → `now`.
+  arrived_at: z.string().datetime().optional(),
 });
+
+/**
+ * Pointage de départ : photo géolocalisée + horodatage réel optionnel (offline).
+ */
+export const departureSchema = pointageSchema.extend({
+  departed_at: z.string().datetime().optional(),
+});
+export type Departure = z.infer<typeof departureSchema>;
 
 /**
  * Édition a posteriori de la déclaration voyageurs (note + dégradation) par le
