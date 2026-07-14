@@ -14,8 +14,10 @@ import env from '@/config/env';
 export const FILE_URL_WINDOW = {
   /** Images peu sensibles (avatar, couverture de logement) : URL stable 24 h. */
   long: 24 * 60 * 60 * 1000,
-  /** Défaut, incl. photos d'intervention (plus sensibles) : URL stable 1 h. */
-  short: 60 * 60 * 1000,
+  /** Défaut (photos d'intervention incluses) : URL stable 24 h également — on
+   *  privilégie le cache client (moins de re-téléchargements au fil de la
+   *  journée) ; l'accès reste protégé par le token dans l'URL. */
+  short: 24 * 60 * 60 * 1000,
 } as const;
 
 /** Champs dont l'URL peut vivre longtemps (contenu non confidentiel). */

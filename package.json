@@ -13,6 +13,7 @@
     "migrate:rollback": "knex migrate:rollback --knexfile src/config/knexfile.js",
     "seed": "knex seed:run --knexfile src/config/knexfile.js",
     "seed:make": "knex seed:make --knexfile src/config/knexfile.js",
+    "backfill:thumbnails": "tsx src/scripts/backfill-thumbnails.ts",
     "test": "jest --verbose",
     "test:unit": "jest --verbose tests/unit",
     "test:integration": "jest --verbose tests/integration"
