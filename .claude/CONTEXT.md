@@ -13,7 +13,7 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 
 | App | Repo | Stack | Déploiement | État |
 |---|---|---|---|---|
-| **API** | `estia-menage-api` | Fastify + Knex (PostgreSQL) + Zod + TS | tag git `[0-9]*` → CI SSH → VPS (docker build + `npm run migrate`) | dernier tag **0.1.58** · `api.estia-clean-connect.fr` |
+| **API** | `estia-menage-api` | Fastify + Knex (PostgreSQL) + Zod + TS | tag git `[0-9]*` → CI SSH → VPS (docker build + `npm run migrate`) | dernier tag **0.1.60** · `api.estia-clean-connect.fr` |
 | **Dashboard** (admin web) | `estia-menage-dashboard` | Next.js (App Router) | tag git `[0-9]*` → CI SSH → VPS | dernier tag **0.1.81** |
 | **Mobile** (presta + admin) | `estia-menage-ui` | Expo SDK 54 + EAS | **OTA** `eas update --branch production --environment production` (JS) · build natif = TestFlight | runtime **0.1.0**, TestFlight **0.1.0 (19)** · bundle `fr.estiacleanconnect.app` |
 
