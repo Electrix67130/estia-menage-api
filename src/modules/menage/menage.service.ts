@@ -94,13 +94,37 @@ class MenageService extends BaseService<MenageRow> {
       if (from) qb.where('menage.date_prevue', '>=', from);
       if (to) qb.where('menage.date_prevue', '<=', to);
       if (restrictToMember && managerUserId) {
+        // Visibilité d'un non-admin. Un ménage assigné à un prestataire ne doit
+        // plus être visible par les AUTRES prestataires (même membres du logement) :
+        //   1. référent (`prestataire_user_id`)
+        //   2. co-prestataire (`menage_prestataire`)
+        //   3. membre manager/client_proprietaire → vue complète du logement
+        //   4. membre prestataire → uniquement les ménages NON assignés (à prendre)
         qb.where((sub) => {
-          sub.where('menage.prestataire_user_id', managerUserId).orWhereExists(function () {
-            this.select('*')
-              .from('logement_member')
-              .whereRaw('logement_member.logement_id = menage.logement_id')
-              .where('logement_member.user_id', managerUserId);
-          });
+          sub
+            .where('menage.prestataire_user_id', managerUserId)
+            .orWhereExists(function () {
+              this.select('*')
+                .from('menage_prestataire')
+                .whereRaw('menage_prestataire.menage_id = menage.id')
+                .where('menage_prestataire.user_id', managerUserId);
+            })
+            .orWhereExists(function () {
+              this.select('*')
+                .from('logement_member')
+                .whereRaw('logement_member.logement_id = menage.logement_id')
+                .where('logement_member.user_id', managerUserId)
+                .whereNot('logement_member.role', 'prestataire');
+            })
+            .orWhere(function () {
+              this.whereNull('menage.prestataire_user_id').whereExists(function () {
+                this.select('*')
+                  .from('logement_member')
+                  .whereRaw('logement_member.logement_id = menage.logement_id')
+                  .where('logement_member.user_id', managerUserId)
+                  .where('logement_member.role', 'prestataire');
+              });
+            });
         });
       }
       if (restrictToAssignee && managerUserId) {

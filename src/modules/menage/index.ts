@@ -104,6 +104,16 @@ export default fp(
           .first());
       const isPrestataire = isReferent || isCoPrestataire;
       if (!isAdmin && !isPrestataire) {
+        // Un membre de rôle `prestataire` ne peut pas ouvrir un ménage assigné à
+        // un AUTRE prestataire : une fois affecté, il n'est plus visible pour lui
+        // (cohérent avec le filtrage de la liste). Les managers/clients gardent
+        // l'accès (soumis à leurs permissions).
+        const member = await fastify.db('logement_member')
+          .where({ logement_id: menage.logement_id, user_id: request.user.sub })
+          .first();
+        if (member?.role === 'prestataire' && menage.prestataire_user_id) {
+          return reply.notFound('Menage not found');
+        }
         await requirePermissionForLogement(
           fastify.db,
           request.user.sub,
