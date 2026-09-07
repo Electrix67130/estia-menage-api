@@ -3,6 +3,7 @@ import { z } from 'zod';
 import LogementService from './logement.service';
 import { createLogementSchema, updateLogementSchema, LogementRow } from './logement.schema';
 import { computeConsommableAlerts } from '@/modules/logement-consommable/logement-consommable.service';
+import LogementCodeService from '@/modules/logement-code/logement-code.service';
 import { getActiveMembership } from '@/lib/active-membership';
 import { geocodeAddress } from '@/lib/geocode';
 import { signFields } from '@/lib/sign-url';
@@ -38,6 +39,7 @@ const uuidSchema = z.object({ id: z.string().uuid() });
 export default fp(
   (fastify, _opts, done) => {
     const service = new LogementService(fastify.db);
+    const codeService = new LogementCodeService(fastify.db);
 
     // GET /logements — liste des logements actifs de l'organisation active
     // Admin : tous les logements de l'org. Non-admin : uniquement ceux où il
@@ -116,6 +118,11 @@ export default fp(
         created_by: request.user.sub,
         organization_id: membership.organization_id,
       });
+      // Le champ legacy `key_safe_code` alimente la liste des codes d'accès
+      // (`logement_code`), source de vérité côté UI.
+      if (data.key_safe_code !== undefined) {
+        await codeService.upsertFromLegacyField(row.id, data.key_safe_code);
+      }
       // Plus d'auto-génération de pièces : elles sont 100% manuelles
       // (nom libre + photo) via /logement-rooms.
       return reply.code(201).send(row);
@@ -152,6 +159,10 @@ export default fp(
             })
           : data;
       const updated = await service.update(id, enriched);
+      // Idem au PATCH : garder la liste des codes alignée sur le champ legacy.
+      if (data.key_safe_code !== undefined) {
+        await codeService.upsertFromLegacyField(id, data.key_safe_code);
+      }
       // Plus d'auto-génération/refresh de pièces : gestion manuelle via /logement-rooms.
       return updated;
     });

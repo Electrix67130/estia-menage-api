@@ -37,6 +37,7 @@ const CATEGORY_FOR_TYPE: Record<string, NotificationCategory> = {
   relance: 'available',
   reminder_eve: 'reminders',
   reminder_2h: 'reminders',
+  beds_missing: 'reminders',
   reschedule_request: 'reschedule',
   reschedule_decision: 'reschedule',
   reschedule_cancelled: 'reschedule',
@@ -480,5 +481,23 @@ export async function notifyMenageRelance(db: Knex, menageId: string): Promise<v
     title: 'Ménage à pourvoir demain',
     body: `${label.dateLabel}${label.lieu} · indique ta disponibilité`,
     data: { menage_id: menageId, type: 'relance' },
+  });
+}
+
+/**
+ * Veille : le nombre de lits à faire n'est pas renseigné sur un ménage de
+ * demain → alerte les admins de l'org pour qu'ils complètent avant l'intervention.
+ * (Le prestataire a besoin du détail des couchages pour préparer le linge.)
+ */
+export async function notifyMenageBedsMissing(db: Knex, menageId: string): Promise<void> {
+  const [label, recipients] = await Promise.all([
+    menageLabel(db, menageId),
+    orgAdminsForMenage(db, menageId),
+  ]);
+  if (!label || recipients.length === 0) return;
+  await sendPushToUsers(db, recipients, {
+    title: 'Lits à renseigner',
+    body: `Demain ${label.dateLabel}${label.lieu} · le nombre de lits à faire n'est pas renseigné.`,
+    data: { menage_id: menageId, type: 'beds_missing' },
   });
 }

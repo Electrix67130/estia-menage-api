@@ -91,6 +91,7 @@ Bien locatif paramétrable.
 | **n_lit_double** | int notnull default 0 | nb lits doubles (couchage 2 personnes) — défaut copié sur chaque ménage |
 | **n_canape_lit** | int notnull default 0 | nb canapés-lits — défaut copié sur chaque ménage |
 | **n_lit_appoint** | int notnull default 0 | nb lits d'appoint — défaut copié sur chaque ménage |
+| **n_lit_parapluie** | int notnull default 0 | nb lits parapluie / lits bébé — défaut copié sur chaque ménage (migration 20260907201349) |
 | has_basement | boolean default false | |
 | has_laundry | boolean default false | |
 | has_pool | boolean default false | piscine → génère une section checklist `pool` |
@@ -99,7 +100,7 @@ Bien locatif paramétrable.
 | enable_check_out | boolean notnull default false | active la prestation check-out (état des lieux/inventaire) → `menage.prestation_type='check_out'` |
 | surface_m2 | int | |
 | notes | text | |
-| key_safe_code | varchar(50) | code de boîte à clef (saisi par l'admin, visible aux membres du logement) ; UI masque le contenu avec un eye toggle |
+| key_safe_code | varchar(50) | **legacy** — miroir du premier code de `logement_code` (voir cette table) ; conservé pour la jointure du détail ménage et les anciens clients |
 | cover_photo_url | varchar(500) | URL d'une photo de couverture du logement (uploadée via flow `/upload`) |
 | cover_photo_thumbnail_url | varchar(500) | Miniature (~400px) de la couverture, générée à l'upload (affichée dans les listes/cards) |
 | color | varchar(9) | code hex `#RRGGBB` utilisé pour différencier les ménages du logement dans les vues calendrier (mobile + dashboard) |
@@ -142,6 +143,7 @@ Prestation de ménage datée.
 | **n_lit_double** | int notnull default 0 | nb lits doubles sur ce ménage |
 | **n_canape_lit** | int notnull default 0 | nb canapés-lits sur ce ménage |
 | **n_lit_appoint** | int notnull default 0 | nb lits d'appoint sur ce ménage |
+| **n_lit_parapluie** | int notnull default 0 | nb lits parapluie / lits bébé sur ce ménage |
 | n_travelers | int | nb de voyageurs (saisi admin ; dimensionne les « lits à faire ») |
 | notes_intervention | text | |
 | archived_at | timestamp | |
@@ -267,6 +269,61 @@ Pièces d'un logement, **100% personnalisables** : nom libre + photo de couvertu
 | created_at, updated_at | timestamp | |
 
 INDEX : `(logement_id)`. Auto-génération `generateForLogement` **désactivée** (les pièces ne sont plus créées depuis les compteurs `n_*` du logement).
+
+### `logement_option` / `menage_option`
+Options proposées au client sur un logement (pack romantique, pack anniversaire…) et options retenues pour une prestation (migration 20260907202719). **Admin only** en écriture ; le prestataire consulte.
+
+**logement_option** : `id` PK · `logement_id` FK logement CASCADE notnull · `label` varchar(150) notnull · `description` text (ce que le presta doit installer) · `position` int · timestamps. INDEX `(logement_id)`.
+
+**menage_option** : `id` PK · `menage_id` FK menage CASCADE notnull · `logement_option_id` FK logement_option CASCADE notnull · `notes` text · timestamps. UNIQUE `(menage_id, logement_option_id)` · INDEX `(menage_id)`. Pas de champ « fait » : le presta ne coche pas.
+
+### `menage_equipement`
+Équipements de l'inventaire du logement à **préparer** pour une prestation (chaise haute, baignoire bébé…), demandés par l'admin et cochés par le prestataire (migration 20260907201349).
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| menage_id | uuid FK menage CASCADE notnull | |
+| logement_equipement_id | uuid FK logement_equipement CASCADE notnull | |
+| quantity | int notnull | défaut 1 |
+| notes | text | |
+| done_at | timestamp | coché « préparé » |
+| done_by | uuid FK user SET NULL | qui l'a préparé |
+| created_at, updated_at | timestamp | |
+
+UNIQUE `(menage_id, logement_equipement_id)` · INDEX `(menage_id)`.
+
+### `logement_code`
+Codes d'accès d'un logement (boîte à clés, portail, alarme…), **plusieurs par logement**, chacun avec un libellé personnalisé (migration 20260907194736).
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| logement_id | uuid FK logement CASCADE notnull | |
+| label | varchar(100) notnull | libellé libre (« Boîte à clés », « Portail »…) |
+| code | varchar(100) notnull | |
+| notes | text | |
+| position | int notnull | tri, défaut 0 |
+| created_at, updated_at | timestamp | |
+
+INDEX : `(logement_id)`. `logement.key_safe_code` devient un **miroir du premier code** (resynchronisé à chaque écriture) pour la jointure `logement_key_safe_code` du détail ménage et les anciens clients.
+
+### `logement_equipement`
+Inventaire des équipements d'un logement (appareil à raclette, plaque de cuisson, lave-vaisselle…). Référentiel du bien : saisi par l'admin, consulté par les prestataires (migration 20260907192518).
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| logement_id | uuid FK logement CASCADE notnull | |
+| logement_room_id | uuid FK logement_room SET NULL | rattachement optionnel à une pièce |
+| label | varchar(200) notnull | libellé libre (le catalogue d'API n'est qu'une aide à la saisie) |
+| category | varchar(50) | cuisine · electromenager · confort · exterieur · loisirs · bebe · securite · autre |
+| quantity | int notnull | défaut 1 |
+| notes | text | |
+| position | int notnull | tri, défaut 0 |
+| created_at, updated_at | timestamp | |
+
+INDEX : `(logement_id)`. Dédup applicative sur `label` (insensible casse/espaces) à l'ajout groupé `POST /logement-equipements/bulk`.
 
 ### `logement_check_template_section` / `logement_check_template_item`
 Template de checklist paramétrable par logement. Utilisé à la création d'un ménage si présent, sinon fallback sur le plan par défaut basé sur les attributs du logement.
@@ -539,6 +596,7 @@ Backfill : pour les rows existantes non-prestataire, les 3 flags sont mis à `tr
 ### `menage` (ajouts rappels push)
 - `reminder_eve_sent_at` timestamp — rappel « veille 18h » envoyé (ou relance si non assigné). Anti-doublon worker.
 - `reminder_2h_sent_at` timestamp — rappel « 2h avant l'horaire » envoyé. Géré par `reminder-worker` (tick 15 min, Europe/Paris).
+- `reminder_beds_sent_at` timestamp — alerte admin « lits à renseigner » (veille 9h) envoyée. Anti-doublon worker (migration 20260907191845).
 
 ### `photo` (ajouts pour photos logement)
 - `menage_id` devient nullable
@@ -559,9 +617,14 @@ organization (id)
 │  ├─ logement_member (logement_id, user_id) → user
 │  ├─ logement_room (logement_id)
 │  │  └─ photo (logement_room_id?)
+│  ├─ logement_equipement (logement_id, logement_room_id?)
+│  ├─ logement_code (logement_id) — codes d'accès multi-libellés
+│  ├─ logement_option (logement_id) — packs proposés au client
 │  ├─ logement_check_template_section (logement_id, logement_room_id?)
 │  │  └─ logement_check_template_item (section_id)
 │  └─ menage (logement_id, organization_id)
+│     ├─ menage_equipement (menage_id, logement_equipement_id) — à préparer
+│     ├─ menage_option (menage_id, logement_option_id) — packs retenus
 │     ├─ menage_check_section (menage_id)
 │     │  └─ menage_check_item (section_id) → user (validated_by)
 │     ├─ menage_reschedule_request (menage_id) → user (requested_by, decided_by)

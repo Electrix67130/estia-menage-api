@@ -6,12 +6,17 @@
  *  - key[:params...]:value
  *  - Bloc VEVENT entre BEGIN:VEVENT et END:VEVENT
  *  - DTSTART / DTEND peuvent être DATE (YYYYMMDD) ou DATETIME (YYYYMMDDTHHMMSSZ)
+ *  - UID est facultatif : certains flux (Cozysmart/PassPass…) ne l'émettent pas,
+ *    on en dérive alors un identifiant stable (cf. `deriveUid`)
  *
  * On évite une dépendance externe (`node-ical`) car ce qu'on traite est
  * vraiment trivial et bien spécifié.
  */
 
+import { createHash } from 'crypto';
+
 export interface IcalEvent {
+  /** UID du flux, ou identifiant dérivé quand le flux n'en fournit pas. */
   uid: string;
   /** Check-in (DTSTART). Format YYYY-MM-DD. */
   start_date: string;
@@ -72,7 +77,40 @@ function parseDate(value: string): string | null {
   return `${m[1]}-${m[2]}-${m[3]}`;
 }
 
-export function parseIcal(text: string): IcalEvent[] {
+/**
+ * UID de repli pour les flux qui n'en émettent pas (RFC 5545 le rend pourtant
+ * obligatoire, mais certains exports — Cozysmart/PassPass… — l'omettent). Sans
+ * UID, l'événement était purement et simplement ignoré, donc aucun ménage créé.
+ *
+ * Deux cas :
+ *  - le SUMMARY ressemble à un identifiant (uuid, référence sans espace) → on le
+ *    prend tel quel : il est stable même si la réservation change de dates ;
+ *  - sinon → hash des dates + du résumé, préfixé `gen-`. `seed` (l'id du
+ *    calendrier) évite toute collision entre deux calendriers du même provider,
+ *    la contrainte d'unicité portant sur `(external_source, external_event_uid,
+ *    prestation_type)`.
+ */
+/**
+ * Vrai quand le SUMMARY est un identifiant technique (uuid, référence sans
+ * espace) plutôt qu'un libellé lisible : sert à en faire un UID de repli, et à
+ * ne PAS le recopier dans les notes du ménage (le presta n'a que faire d'un uuid).
+ */
+export function isIdLikeSummary(summary: string | undefined): boolean {
+  return /^[A-Za-z0-9._:@-]{8,}$/.test((summary ?? '').trim());
+}
+
+function deriveUid(ev: Partial<IcalEvent>, seed: string): string {
+  const summary = (ev.summary ?? '').trim();
+  if (isIdLikeSummary(summary)) return summary;
+  const material = `${seed}|${ev.start_date ?? ''}|${ev.end_date ?? ''}|${summary}`;
+  return `gen-${createHash('sha1').update(material).digest('hex').slice(0, 32)}`;
+}
+
+/**
+ * @param uidSeed identifiant du calendrier, utilisé pour dériver un UID unique
+ *   quand le flux n'en fournit pas.
+ */
+export function parseIcal(text: string, uidSeed = ''): IcalEvent[] {
   const lines = unfoldLines(text);
   const events: IcalEvent[] = [];
   let current: Partial<IcalEvent> | null = null;
@@ -83,8 +121,9 @@ export function parseIcal(text: string): IcalEvent[] {
       continue;
     }
     if (line === 'END:VEVENT') {
-      if (current && current.uid && current.start_date && current.end_date) {
-        events.push(current as IcalEvent);
+      // UID facultatif : on le dérive quand le flux ne le fournit pas.
+      if (current && current.start_date && current.end_date) {
+        events.push({ ...current, uid: current.uid || deriveUid(current, uidSeed) } as IcalEvent);
       }
       current = null;
       continue;

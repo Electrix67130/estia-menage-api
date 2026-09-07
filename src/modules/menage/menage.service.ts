@@ -205,6 +205,7 @@ class MenageService extends BaseService<MenageRow> {
       n_lit_double: data.n_lit_double ?? logement.n_lit_double,
       n_canape_lit: data.n_canape_lit ?? logement.n_canape_lit,
       n_lit_appoint: data.n_lit_appoint ?? logement.n_lit_appoint,
+      n_lit_parapluie: data.n_lit_parapluie ?? logement.n_lit_parapluie,
     };
     return this.db.transaction(async (trx) => {
       const [menage] = (await trx('menage').insert(withDefaults).returning('*')) as MenageRow[];

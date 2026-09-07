@@ -5,7 +5,7 @@ import {
   UpdateExternalCalendar,
   SyncResult,
 } from './logement-external-calendar.schema';
-import { parseIcal, isBlockedEvent, IcalEvent } from './ical-parser';
+import { parseIcal, isBlockedEvent, isIdLikeSummary, IcalEvent } from './ical-parser';
 import { generateChecklistForMenage } from '@/modules/menage-check/menage-check.service';
 import { LogementRow } from '@/modules/logement/logement.schema';
 import { notifyMenageAvailable, notifyMenageCancelled } from '@/lib/push';
@@ -86,7 +86,7 @@ class LogementExternalCalendarService {
 
     let events: IcalEvent[];
     try {
-      events = parseIcal(text);
+      events = parseIcal(text, cal.id);
       // Filtre les CANCELLED si présents (RFC 5545 §3.8.1.11).
       events = events.filter((e) => (e.status ?? '').toUpperCase() !== 'CANCELLED');
     } catch (err) {
@@ -244,7 +244,12 @@ class LogementExternalCalendarService {
             isMenageType && defaultLaundryIncluded ? defaultLaundryClient : null,
           laundry_provider_price:
             isMenageType && defaultLaundryIncluded ? defaultLaundryProvider : null,
-          notes_intervention: ev.summary ? `Auto (${cal.provider}) : ${ev.summary}` : `Auto (${cal.provider})`,
+          // Un SUMMARY purement technique (uuid de réservation) n'apporte rien
+          // au prestataire → on ne garde que les libellés lisibles.
+          notes_intervention:
+            ev.summary && !isIdLikeSummary(ev.summary)
+              ? `Auto (${cal.provider}) : ${ev.summary}`
+              : `Auto (${cal.provider})`,
           external_source: externalSource,
           external_event_uid: ev.uid,
           external_calendar_id: cal.id,

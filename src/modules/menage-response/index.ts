@@ -96,8 +96,8 @@ export default fp(
               message: "L'utilisateur n'est pas prestataire de ce logement",
             });
           }
-          const response = await service.upsert(id, bodyUserId, status);
-          return response;
+          const { row } = await service.upsert(id, bodyUserId, status);
+          return row;
         }
 
         // Cas normal : le current user vote pour lui-même → doit être presta du logement
@@ -110,12 +110,16 @@ export default fp(
           });
         }
 
-        const response = await service.upsert(id, request.user.sub, status);
-        // Signaler aux admins que le prestataire s'est positionné (présent/absent).
-        notifyMenageResponse(fastify.db, id, request.user.sub, status).catch((err) =>
-          fastify.log.error({ err }, 'push response failed'),
-        );
-        return response;
+        const { row, changed } = await service.upsert(id, request.user.sub, status);
+        // Signaler aux admins que le prestataire s'est positionné — uniquement
+        // si sa réponse a changé : re-confirmer le même statut ne doit pas
+        // renvoyer une push identique.
+        if (changed) {
+          notifyMenageResponse(fastify.db, id, request.user.sub, status).catch((err) =>
+            fastify.log.error({ err }, 'push response failed'),
+          );
+        }
+        return row;
       },
     );
 

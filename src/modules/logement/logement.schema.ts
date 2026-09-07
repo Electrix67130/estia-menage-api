@@ -12,6 +12,7 @@ export const createLogementSchema = z.object({
   n_lit_double: z.number().int().min(0).max(50).default(0),
   n_canape_lit: z.number().int().min(0).max(50).default(0),
   n_lit_appoint: z.number().int().min(0).max(50).default(0),
+  n_lit_parapluie: z.number().int().min(0).max(50).default(0),
   n_bathrooms: z.number().int().min(0).max(50).default(0),
   n_wc: z.number().int().min(0).max(50).default(0),
   n_kitchens: z.number().int().min(0).max(10).default(1),
@@ -58,6 +59,7 @@ export const updateLogementSchema = z.object({
   n_lit_double: z.number().int().min(0).max(50).optional(),
   n_canape_lit: z.number().int().min(0).max(50).optional(),
   n_lit_appoint: z.number().int().min(0).max(50).optional(),
+  n_lit_parapluie: z.number().int().min(0).max(50).optional(),
   n_bathrooms: z.number().int().min(0).max(50).optional(),
   n_wc: z.number().int().min(0).max(50).optional(),
   n_kitchens: z.number().int().min(0).max(10).optional(),
@@ -108,6 +110,7 @@ export type LogementRow = {
   n_lit_double: number;
   n_canape_lit: number;
   n_lit_appoint: number;
+  n_lit_parapluie: number;
   n_bathrooms: number;
   n_wc: number;
   n_kitchens: number;

@@ -14,6 +14,26 @@ const listSchema = z.object({
 
 const uuidSchema = z.object({ id: z.string().uuid() });
 
+/**
+ * Un non-admin ne voit une fiche client que s'il a `can_view_clients` sur AU
+ * MOINS UN logement rattaché à ce client. Un prestataire a ce flag à `false`
+ * par défaut (rôle « discret ») → aucune info client. La liste complète des
+ * clients de l'org, elle, reste réservée à l'admin.
+ */
+async function canViewClient(
+  db: import('knex').Knex,
+  userId: string,
+  clientId: string,
+): Promise<boolean> {
+  const row = await db('logement')
+    .join('logement_member', 'logement_member.logement_id', 'logement.id')
+    .where('logement.client_id', clientId)
+    .andWhere('logement_member.user_id', userId)
+    .andWhere('logement_member.can_view_clients', true)
+    .first();
+  return Boolean(row);
+}
+
 const reportQuerySchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD'),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD'),
@@ -23,14 +43,16 @@ export default fp(
   (fastify, _opts, done) => {
     const service = new ClientService(fastify.db);
 
+    // GET /clients — annuaire complet des clients de l'org : ADMIN ONLY.
+    // Un prestataire n'a rien à faire dans le fichier client.
     fastify.get('/clients', { preHandler: [fastify.authenticate] }, async (request, reply) => {
       const query = listSchema.parse(request.query);
       const membership = await getActiveMembership(fastify.db, request.user.sub);
-      if (!membership) {
+      if (membership?.role !== 'admin') {
         return reply.code(403).send({
           statusCode: 403,
           error: 'Forbidden',
-          message: 'No active organization',
+          message: 'Admin only',
         });
       }
       return service.findActiveByOrg(membership.organization_id, query);
@@ -42,6 +64,12 @@ export default fp(
       if (!membership) return reply.notFound('Client not found');
       const client = await service.findById(id);
       if (!client || client.organization_id !== membership.organization_id) {
+        return reply.notFound('Client not found');
+      }
+      if (
+        membership.role !== 'admin' &&
+        !(await canViewClient(fastify.db, request.user.sub, id))
+      ) {
         return reply.notFound('Client not found');
       }
       return client;
@@ -81,6 +109,12 @@ export default fp(
         if (!membership) return reply.notFound('Client not found');
         const client = await service.findById(id);
         if (!client || client.organization_id !== membership.organization_id) {
+          return reply.notFound('Client not found');
+        }
+        if (
+          membership.role !== 'admin' &&
+          !(await canViewClient(fastify.db, request.user.sub, id))
+        ) {
           return reply.notFound('Client not found');
         }
         return service.findLogements(id);

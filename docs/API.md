@@ -88,11 +88,16 @@ Réponses paginées : `{ data: [...], meta: { total, page, limit, totalPages } }
 
 Fiche client (facturation). Pas de compte utilisateur — un client est juste une entité rattachée à un logement pour la facturation. Plusieurs logements peuvent être rattachés à un même client.
 
+> **Confidentialité** : l'annuaire client (`GET /clients`) est **réservé à l'admin**. Un non-admin
+> n'accède à une fiche que s'il a `can_view_clients` sur au moins un logement rattaché à ce client —
+> flag à `false` par défaut pour le rôle `prestataire`. Un prestataire ne voit donc **aucune info
+> client**, ni dans « Équipe », ni sur la fiche logement.
+
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/clients?search=` | Liste paginée des clients de l'org |
-| GET | `/clients/:id` | Détail |
-| GET | `/clients/:id/logements` | Logements rattachés à ce client |
+| GET | `/clients?search=` | Liste paginée des clients de l'org — **admin only** |
+| GET | `/clients/:id` | Détail — admin, ou membre avec `can_view_clients` sur un logement de ce client (404 sinon) |
+| GET | `/clients/:id/logements` | Logements rattachés — même règle que le détail |
 | GET | `/clients/:id/report?from=YYYY-MM-DD&to=YYYY-MM-DD` | **Rapport compta** détaillé sur la période : ménages (date, logement, prestataires, options linge, prix client HT/TVA, prix prestataire) via `logement.client_id`. Exclut les ménages annulés. Admin only. |
 | POST | `/clients` | Création (admin) |
 | PATCH | `/clients/:id` | Mise à jour (admin) |
@@ -228,6 +233,89 @@ Pièces du logement, **100% personnalisables** : nom libre + photo de couverture
 
 ---
 
+## Logement code (codes d'accès)
+
+Plusieurs codes par logement, chacun avec un **libellé personnalisé** (« Boîte à clés »,
+« Portail », « Alarme », « Wi-Fi »…). Remplace le champ unique `logement.key_safe_code`.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/logement-codes/label-suggestions` | Libellés proposés (chips UI, partagés dashboard/mobile) |
+| GET | `/logement-codes?logement_id=` | Codes d'un logement (triés par `position`) |
+| POST | `/logement-codes` | Ajout (admin) |
+| PATCH | `/logement-codes/:id` | Mise à jour (admin) |
+| DELETE | `/logement-codes/:id` | Suppression (admin) |
+
+`POST /logement-codes` body :
+```json
+{ "logement_id": "uuid", "label": "Portail", "code": "A1234B", "notes": "Puis tourner à gauche" }
+```
+
+- `label` (1-100) et `code` (1-100) sont **libres** ; les suggestions ne sont qu'une aide à la saisie.
+- `position` — ordre d'affichage ; auto-incrémenté (fin de liste) si absent.
+
+**Qui peut lire** (sinon 404) : l'admin de l'org · tout `logement_member` · **un prestataire affecté
+à un ménage du logement même s'il n'en est pas membre** (remplaçant sur une seule prestation — sans
+le code il ne peut pas entrer). Écriture : admin uniquement.
+
+**Champ legacy `logement.key_safe_code`** : conservé comme **miroir du premier code** de la liste,
+resynchronisé à chaque écriture sur `/logement-codes`. Le détail ménage continue donc d'exposer
+`logement_key_safe_code` par jointure et les anciens clients restent fonctionnels. Inversement, un
+`key_safe_code` envoyé à `POST`/`PATCH /logements` alimente la liste sous le libellé « Boîte à clés »
+(vide ⇒ cette ligne est supprimée). Les codes existants ont été repris par la migration 20260907194736.
+
+---
+
+## Logement equipement (inventaire du bien)
+
+Inventaire des équipements d'un logement (appareil à raclette, plaque de cuisson, lave-vaisselle…).
+**Écriture admin, lecture pour tous les membres de l'org** : le prestataire doit savoir ce qui est
+sur place. Rattachement optionnel à une pièce (`logement_room_id`) — la ligne remonte alors `room_name`.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/logement-equipements/catalog` | Catalogue de suggestions par famille (partagé dashboard/mobile) |
+| GET | `/logement-equipements?logement_id=` | Inventaire d'un logement (trié par `position`, puis `label`) |
+| POST | `/logement-equipements` | Ajout d'un équipement (admin) |
+| POST | `/logement-equipements/bulk` | Ajout groupé depuis le catalogue (admin) |
+| PATCH | `/logement-equipements/:id` | Mise à jour (admin) |
+| DELETE | `/logement-equipements/:id` | Suppression (admin) |
+
+`POST /logement-equipements` body :
+```json
+{
+  "logement_id": "uuid",
+  "label": "Appareil à raclette",
+  "category": "cuisine",
+  "quantity": 1,
+  "logement_room_id": "uuid",
+  "notes": "Dans le placard du haut"
+}
+```
+
+- `label` — libellé **libre** (1-200). Le catalogue n'est qu'une aide à la saisie, jamais une contrainte.
+- `category` — `cuisine` · `electromenager` · `confort` · `exterieur` · `loisirs` · `bebe` · `securite` · `autre`. Optionnelle, sert au regroupement dans l'UI.
+- `quantity` — défaut `1` (1-999).
+- `position` — ordre d'affichage ; auto-incrémenté (fin de liste) si absent.
+
+`POST /logement-equipements/bulk` body — l'admin coche plusieurs suggestions d'un coup :
+```json
+{
+  "logement_id": "uuid",
+  "items": [
+    { "label": "Four", "category": "cuisine" },
+    { "label": "Lave-vaisselle", "category": "electromenager", "quantity": 1 }
+  ]
+}
+```
+**Idempotent** : un libellé déjà présent sur le logement (comparaison insensible à la casse et aux
+espaces) est ignoré — un double-envoi ne crée pas de doublon. Renvoie l'**inventaire complet à jour**.
+
+`GET /logement-equipements/catalog` renvoie `{ categories: [{ key, label, suggestions: string[] }] }`.
+Il est servi par l'API pour que dashboard et mobile affichent la même liste sans la dupliquer.
+
+---
+
 ## Logement check template
 
 Checklist paramétrable par logement (utilisée à la création d'un ménage à la place du plan auto-généré, si présente).
@@ -294,6 +382,13 @@ Calendriers iCal externes rattachés à un logement. **Admin only** (même org q
 - `provider` ∈ `airbnb` | `booking` | `vrbo` | `ical` (défaut `ical`). `url` (requise, ≤1000). `label` optionnel. `enabled` défaut `true`.
 - Champs lecture : `last_synced_at`, `last_error` (dernière erreur de fetch/parse).
 - `POST …/:id/sync` réponse : `{ fetched_events, created_menages, updated_menages, cancelled_menages, error?, calendar }`.
+
+**Tolérance du parser** (`ical-parser.ts`) :
+- **`UID` facultatif.** La RFC l'impose, mais certains exports (channel managers type Cozysmart/PassPass, qui consomment le lien Booking et le ré-exportent) ne l'émettent pas. Sans repli, ces événements étaient **silencieusement ignorés** → aucun ménage créé. On dérive alors un UID stable : le `SUMMARY` s'il ressemble à un identifiant (uuid, référence sans espace), sinon `gen-<sha1(cal_id|dates|summary)>` — l'id du calendrier entre dans le hash pour ne pas violer l'unicité `(external_source, external_event_uid, prestation_type)`.
+- Un `SUMMARY` purement technique (uuid) n'est **pas** recopié dans `notes_intervention` : le ménage porte juste `Auto (<provider>)`.
+- `DTSTART`/`DTEND` acceptés en `DATE`, en `DATETIME` UTC **et en heure locale sans `Z`** ; seule la partie date est utilisée.
+
+> ⚠️ Ne pas changer le `provider` d'un calendrier déjà synchronisé : `external_source` (`cal_<provider>`) fait partie de la clé d'unicité des ménages, donc les prestations déjà créées seraient recréées en double.
 
 ---
 
@@ -496,6 +591,64 @@ Un même ménage peut être affecté à **plusieurs prestataires** via la table 
 ```
 
 **Note transition** : le `PATCH /menages/:id { prestataire_user_id }` historique reste fonctionnel et synchronise la jointure (le user défini devient le seul prestataire). Pour affecter plusieurs prestas, utiliser `PUT /menages/:id/prestataires`.
+
+---
+
+## Menage equipements (à préparer)
+
+Équipements de l'inventaire du logement que l'admin demande de **préparer** pour une prestation
+donnée (chaise haute, baignoire bébé, lit parapluie…). Le prestataire les voit sur sa prestation en
+**lecture seule** : il consulte ce qu'il doit installer, il ne coche rien (seul l'admin suit l'état).
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/menages/:id/equipements` | Liste des équipements à préparer (accès prestation) |
+| PUT | `/menages/:id/equipements` | Définit la liste (admin) |
+| PATCH | `/menages/:id/equipements/:equipement_id` | Coche/décoche « préparé » (**admin only**) |
+
+`PUT` body — remplace la liste (`items: []` la vide) :
+```json
+{ "items": [ { "logement_equipement_id": "uuid", "quantity": 1, "notes": "dans la cave" } ] }
+```
+- Les équipements doivent appartenir au **logement de la prestation** (sinon `400`).
+- Les lignes conservées **gardent leur `done_at`** : ré-enregistrer la liste ne décoche pas ce qui est
+  déjà marqué préparé.
+
+`PATCH` body : `{ "done": true }` → renseigne `done_at`/`done_by` (ou les efface si `false`).
+
+Chaque ligne renvoie la demande + l'équipement joint : `label`, `category`, `room_name`,
+`quantity`, `notes`, `done_at`, `done_by` (+ `done_by_first_name`/`done_by_last_name`).
+
+---
+
+## Logement options (packs) & options d'une prestation
+
+Options proposées au client sur un logement (**pack romantique**, **pack anniversaire**, panier
+gourmand…), configurées par l'admin dans la préparation du logement. Sur une prestation, l'admin
+coche celles retenues par le client ; **le prestataire les consulte pour les installer, en lecture
+seule** — il ne coche rien.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/logement-options/suggestions` | Packs proposés à la saisie (partagés dashboard/mobile) |
+| GET | `/logement-options?logement_id=` | Options configurées sur un logement |
+| POST | `/logement-options` | Ajout (admin) |
+| PATCH | `/logement-options/:id` | Mise à jour (admin) |
+| DELETE | `/logement-options/:id` | Suppression (admin) |
+| GET | `/menages/:id/options` | Options retenues pour la prestation (accès prestation) |
+| PUT | `/menages/:id/options` | Définit les options retenues (**admin only**) |
+
+`POST /logement-options` body :
+```json
+{ "logement_id": "uuid", "label": "Pack romantique", "description": "Pétales sur le lit, bougies, champagne au frais" }
+```
+- `label` (1-150) libre ; `description` = ce que le prestataire doit installer, affiché sur la prestation.
+
+`PUT /menages/:id/options` body — remplace la liste (`items: []` la vide) :
+```json
+{ "items": [ { "logement_option_id": "uuid", "notes": "prénom Léa sur la carte" } ] }
+```
+Les options doivent appartenir au **logement de la prestation** (sinon `400`).
 
 ---
 
@@ -849,7 +1002,7 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 - **Demande de report** → admins de l'org (`POST /reschedule-requests`).
 - **Report accepté/refusé** → prestataire demandeur (`POST /reschedule-requests/:id/decide`).
 - **Report annulé** → admins de l'org (`POST /reschedule-requests/:id/cancel`).
-- **Réponse présent/absent** → admins de l'org (`POST /menages/:id/responses`, auto-réponse du presta).
+- **Réponse présent/absent** → admins de l'org (`POST /menages/:id/responses`), **uniquement si le statut change** : re-poster la même réponse (re-clic, re-confirmation après affectation) ne renvoie pas de push.
 - **Prestataire arrivé / ménage terminé** → admins de l'org (`POST /menages/:id/arrival` · `/departure`).
 - **Ménage validé** → prestataires assignés (`POST /menages/:id/validate`).
 - **Nouveau commentaire** → participants du ménage hors auteur (`POST /comments`).
@@ -857,8 +1010,9 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 - **Consommables à racheter** → admins de l'org, quand un relevé de fin passe des consommables sous le seuil (`PUT /menages/:id/consommables`).
 - **Invitation acceptée** → l'inviteur, quand l'invité finalise son inscription (`POST /auth/register` avec `invitation_token`).
 
-**Rappels programmés** (worker `reminder-worker`, tick 15 min, fuseau Europe/Paris ; anti-doublon via `menage.reminder_eve_sent_at` / `reminder_2h_sent_at`) :
+**Rappels programmés** (worker `reminder-worker`, tick 15 min, fuseau Europe/Paris ; anti-doublon via `menage.reminder_eve_sent_at` / `reminder_beds_sent_at` / `reminder_2h_sent_at`) :
 - **Veille 18h** → prestataires assignés (« Demain · … ») ; si le ménage est **non assigné**, **relance** les prestataires du logement **non encore positionnés** (présent/absent).
+- **Veille 9h** → admins de l'org quand le ménage du lendemain n'a **aucun couchage renseigné** (`n_lit_simple + n_lit_double + n_canape_lit + n_lit_appoint + n_lit_parapluie = 0`) : « Lits à renseigner » (`type: beds_missing`, catégorie `reminders`). Uniquement `prestation_type = menage`.
 - **2h avant** l'`horaire_prevu` → prestataires assignés.
 
 Chaque notification embarque `data: { menage_id, type }` pour router vers le ménage au tap.

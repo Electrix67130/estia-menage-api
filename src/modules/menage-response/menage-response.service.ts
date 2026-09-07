@@ -31,11 +31,22 @@ class MenageResponseService {
    * le status + responded_at. Sinon on crée. La contrainte UNIQUE garantit
    * qu'on n'a jamais 2 réponses pour le même couple.
    */
+  /**
+   * Enregistre (ou met à jour) la réponse d'un prestataire.
+   *
+   * `changed` dit si le statut a réellement changé : un presta qui re-clique
+   * « disponible » alors qu'il l'était déjà ne doit pas re-notifier les admins
+   * (typiquement : il se positionne depuis la liste, puis re-confirme depuis le
+   * détail une fois affecté → l'admin recevait deux fois la même push).
+   */
   async upsert(
     menageId: string,
     userId: string,
     status: MenageResponseStatus,
-  ): Promise<MenageResponseRow> {
+  ): Promise<{ row: MenageResponseRow; changed: boolean }> {
+    const previous = (await this.db('menage_response')
+      .where({ menage_id: menageId, user_id: userId })
+      .first()) as MenageResponseRow | undefined;
     const now = new Date();
     await this.db('menage_response')
       .insert({
@@ -51,7 +62,7 @@ class MenageResponseService {
     const row = (await this.db('menage_response')
       .where({ menage_id: menageId, user_id: userId })
       .first()) as MenageResponseRow;
-    return row;
+    return { row, changed: previous?.status !== status };
   }
 
   /**

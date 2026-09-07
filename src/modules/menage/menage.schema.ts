@@ -30,6 +30,7 @@ export const createMenageSchema = z.object({
   n_lit_double: z.number().int().min(0).max(50).optional(),
   n_canape_lit: z.number().int().min(0).max(50).optional(),
   n_lit_appoint: z.number().int().min(0).max(50).optional(),
+  n_lit_parapluie: z.number().int().min(0).max(50).optional(),
   n_travelers: z.number().int().min(0).max(50).optional(),
   notes_intervention: z.string().max(5000).optional(),
 });
@@ -52,6 +53,7 @@ export const updateMenageSchema = z.object({
   n_lit_double: z.number().int().min(0).max(50).optional(),
   n_canape_lit: z.number().int().min(0).max(50).optional(),
   n_lit_appoint: z.number().int().min(0).max(50).optional(),
+  n_lit_parapluie: z.number().int().min(0).max(50).optional(),
   n_travelers: z.number().int().min(0).max(50).nullable().optional(),
   notes_intervention: z.string().max(5000).nullable().optional(),
   status: menageStatusEnum.optional(),
@@ -235,6 +237,7 @@ export type MenageRow = {
   n_lit_double: number;
   n_canape_lit: number;
   n_lit_appoint: number;
+  n_lit_parapluie: number;
   n_travelers: number | null;
   validated_at: string | null;
   validated_by: string | null;
