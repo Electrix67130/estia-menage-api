@@ -225,6 +225,7 @@ docker compose -f docker-compose.prod.yml build api
 docker compose -f docker-compose.prod.yml run --rm api npm run migrate
 docker compose -f docker-compose.prod.yml up -d
 docker image prune -f
+docker builder prune -f --keep-storage 2GB
 EOF
 chmod +x /home/estia/deploy.sh
 ```
@@ -323,6 +324,10 @@ docker compose -f docker-compose.prod.yml build api
 docker compose -f docker-compose.prod.yml run --rm api npm run migrate
 docker compose -f docker-compose.prod.yml up -d
 docker image prune -f
+# Cache de build Docker borné à 2 Go : sans ça il grossit à chaque déploiement
+# et finit par remplir le disque (7,9 Go au total), ce qui fait échouer le
+# `docker build` avec « no space left on device ».
+docker builder prune -f --keep-storage 2GB
 
 # Dashboard (Next.js natif + systemd — cf. §4.2)
 cd /home/estia/dashboard
@@ -330,9 +335,38 @@ git pull origin master
 npm ci
 npm run build
 sudo systemctl restart estia-dashboard
+
+# Caches accessoires : apt et npm se re-remplissent tout seuls au besoin.
+sudo apt-get clean
+npm cache clean --force >/dev/null 2>&1 || true
+echo "--- Disque après déploiement ---"
+df -h /
 EOF
 chmod +x /home/estia/deploy.sh
 ```
+
+### Garde-fous disque (obligatoires)
+
+Le VPS n'a que **7,9 Go**. Le 2026-09-07, un déploiement a échoué sur
+`no space left on device` : cache de build Docker (869 Mo), journaux systemd
+(462 Mo), caches apt (580 Mo) et npm (772 Mo) avaient rempli le disque.
+
+Deux garde-fous, en plus des `prune` du `deploy.sh` ci-dessus :
+
+```bash
+# 1. Plafonner les journaux systemd (sinon ils grossissent sans limite)
+sudo sed -i 's/^\[Journal\]/[Journal]\nSystemMaxUse=200M\nSystemMaxFileSize=50M/' /etc/systemd/journald.conf
+sudo systemctl restart systemd-journald
+journalctl --disk-usage   # doit rester sous 200M
+
+# 2. Vérifier l'espace avant un gros déploiement
+df -h /
+docker system df          # colonne RECLAIMABLE = ce qu'un prune libérerait
+```
+
+> ⚠️ **Ne jamais lancer `docker system prune --volumes`** : la base Postgres vit
+> dans le volume `estia_db_data` (`docker-compose.prod.yml`), elle serait effacée.
+> Pour libérer de la place : `docker builder prune -af` puis `docker image prune -af`.
 
 **Coût** : 0 € (utilise les ressources du VPS déjà payé)
 
