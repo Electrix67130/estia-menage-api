@@ -345,13 +345,26 @@ EOF
 chmod +x /home/estia/deploy.sh
 ```
 
+> ⚠️ **Le `deploy.sh` unique ci-dessus est obsolète.** La CI appelle en réalité
+> **deux** scripts, avec la ref git en argument (tag ou branche) :
+> `/home/estia/deploy-api.sh $REF` (workflow `estia-menage-api`) et
+> `/home/estia/deploy-dashboard.sh $REF` (workflow `estia-menage-dashboard`).
+> Chacun fait `git fetch --tags` puis `git checkout --force` de la ref reçue.
+> C'est là qu'il faut mettre tout garde-fou — modifier `deploy.sh` n'a aucun effet.
+
 ### Garde-fous disque (obligatoires)
 
 Le VPS n'a que **7,9 Go**. Le 2026-09-07, un déploiement a échoué sur
 `no space left on device` : cache de build Docker (869 Mo), journaux systemd
 (462 Mo), caches apt (580 Mo) et npm (772 Mo) avaient rempli le disque.
 
-Deux garde-fous, en plus des `prune` du `deploy.sh` ci-dessus :
+En place sur le VPS :
+
+- `deploy-api.sh` : `docker builder prune -f --keep-storage 2GB` après le build, puis `df -h /`.
+- `deploy-dashboard.sh` : `apt-get clean` + `npm cache clean --force`, puis `df -h /`.
+
+Les deux affichent l'espace restant en fin de déploiement : le prochain remplissage
+se verra dans les logs de la CI avant de provoquer une panne. Plus, côté système :
 
 ```bash
 # 1. Plafonner les journaux systemd (sinon ils grossissent sans limite)
