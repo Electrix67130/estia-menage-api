@@ -1,0 +1,23 @@
+# Base de donnees jetable pour la suite de tests.
+#
+# Volontairement sans volume : les donnees ne survivent pas a `down`, ce qui est
+# le comportement voulu. Le port 5434 evite toute collision avec la base de
+# developpement (5432) et avec celle d'un autre projet (Buildr occupe 5433) — et sert de garde-fou supplementaire : meme mal
+# configures, les tests ne peuvent pas se connecter a la base de dev.
+services:
+  postgres-test:
+    image: postgres:17-alpine
+    container_name: estia-postgres-test
+    environment:
+      POSTGRES_DB: estia_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5434:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d estia_test']
+      interval: 1s
+      timeout: 3s
+      retries: 30

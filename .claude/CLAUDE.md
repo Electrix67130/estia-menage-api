@@ -17,8 +17,27 @@ npm run migrate:make     # Creer une migration (ex: npm run migrate:make -- crea
 npm run migrate:rollback # Rollback la derniere migration
 npm run seed             # Lancer les seeds
 npm run seed:make        # Creer un seed
-npm test                 # Lancer les tests
+npm test                 # Toute la suite (unitaires + integration)
+npm run test:unit        # Unitaires seuls — aucune base requise
+npm run test:integration # Integration — exige la base de test
+npm run test:watch       # Mode watch
+npm run test:db:up       # Demarre la base de test jetable (port 5434)
+npm run test:db:down     # L'arrete
 ```
+
+## Tests
+
+- **Vitest**, deux etages : `tests/unit` (fonctions pures, sans base) et
+  `tests/integration` (routes reelles via `app.inject()`, contre un vrai PostgreSQL).
+- La base de test est **jetable** : conteneur sans volume, port **5434** (5432 = dev,
+  5433 = Buildr). `tests/global-setup.ts` refuse de demarrer si la cible ne finit pas
+  par `_test`, n'est pas sur 5434 ou n'est pas locale — les tests TRUNCATE, se tromper
+  de base couterait cher.
+- Helpers dans `tests/helpers` : `createTestApp()` (app complete + cle d'API posee
+  d'office), `truncateAll()` (entre chaque test) et les fabriques (`createOrgWithAdmin`,
+  `createUser`, `createSuperAdmin`, `createLogement`, `createMenage`...).
+- Les fichiers d'integration s'executent **en serie** : ils partagent une base.
+- La CI joue `npx tsc --noEmit` **puis** `npm test` avant tout deploiement.
 
 ## Architecture
 

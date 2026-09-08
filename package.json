@@ -14,9 +14,12 @@
     "seed": "knex seed:run --knexfile src/config/knexfile.js",
     "seed:make": "knex seed:make --knexfile src/config/knexfile.js",
     "backfill:thumbnails": "tsx src/scripts/backfill-thumbnails.ts",
-    "test": "jest --verbose",
-    "test:unit": "jest --verbose tests/unit",
-    "test:integration": "jest --verbose tests/integration"
+    "test": "vitest run",
+    "test:unit": "vitest run --project unitaires",
+    "test:integration": "vitest run --project integration",
+    "test:watch": "vitest",
+    "test:db:up": "docker compose -f docker-compose.test.yml up -d --wait",
+    "test:db:down": "docker compose -f docker-compose.test.yml down"
   },
   "repository": {
     "type": "git",
@@ -56,6 +59,8 @@
     "@types/nodemailer": "^8.0.0",
     "@types/ws": "^8.18.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^3.2.7"
   }
 }

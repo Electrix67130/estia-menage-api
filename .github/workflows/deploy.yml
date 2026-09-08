@@ -28,8 +28,26 @@ concurrency:
 
 jobs:
   check:
-    name: Typecheck
+    name: Typecheck & tests
     runs-on: ubuntu-latest
+    # La base de test tourne en service du job : les tests d'intégration
+    # jouent contre un vrai PostgreSQL, comme en local. Port 5434, celui
+    # qu'attend `tests/global-setup.ts` — il refuse de démarrer sur un autre,
+    # pour qu'aucune suite ne puisse vider une base qui ne serait pas jetable.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: estia_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d estia_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,6 +56,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
+      - run: npm test
 
   deploy:
     name: Deploy over SSH
