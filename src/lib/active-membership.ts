@@ -8,6 +8,10 @@ export interface ActiveMembership {
 /**
  * Recupere la membership active d'un user (organization_id + role dans cette org).
  * Renvoie null si l'user n'a pas d'org active (cas edge : user sans aucune membership).
+ *
+ * Une organisation **désactivée** par le super admin (`organization.is_active`
+ * à false) ne rend plus de membership : sans ça le kill switch n'éteindrait
+ * rien, puisque toutes les routes métier passent par ici.
  */
 export async function getActiveMembership(
   db: Knex,
@@ -21,10 +25,16 @@ export async function getActiveMembership(
         'user.active_organization_id',
       );
     })
+    .leftJoin('organization', 'organization.id', 'user.active_organization_id')
     .where('user.id', userId)
-    .select('user.active_organization_id as organization_id', 'organization_member.role as role')
+    .select(
+      'user.active_organization_id as organization_id',
+      'organization_member.role as role',
+      'organization.is_active as org_active',
+    )
     .first();
   if (!row?.organization_id || !row.role) return null;
+  if (row.org_active === false) return null;
   return { organization_id: row.organization_id, role: row.role };
 }
 

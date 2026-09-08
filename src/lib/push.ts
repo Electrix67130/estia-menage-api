@@ -501,3 +501,23 @@ export async function notifyMenageBedsMissing(db: Knex, menageId: string): Promi
     data: { menage_id: menageId, type: 'beds_missing' },
   });
 }
+
+/**
+ * Réponse de l'admin à un signalement (bug / suggestion) → son auteur.
+ *
+ * Volontairement hors des catégories de préférences : c'est la réponse à un
+ * message que la personne a elle-même envoyé, elle l'attend. La couper n'aurait
+ * pas de sens.
+ */
+export async function notifyFeedbackReply(
+  db: Knex,
+  userId: string,
+  feedbackId: string,
+  subject: string,
+): Promise<void> {
+  await sendPushToUsers(db, [userId], {
+    title: 'Réponse à ton signalement',
+    body: subject,
+    data: { feedback_id: feedbackId, type: 'feedback_reply' },
+  });
+}

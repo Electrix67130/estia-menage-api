@@ -12,8 +12,25 @@ declare module 'fastify' {
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
-    payload: { sub: string; email: string; jti?: string; platform?: 'mobile' | 'web' };
-    user: { sub: string; email: string; jti?: string; platform?: 'mobile' | 'web' };
+    /**
+     * `impersonated_by` : id du super admin quand le token a été signé au nom
+     * d'un autre utilisateur (support). Présent uniquement dans ce cas — il rend
+     * l'usurpation lisible dans le token lui-même, pas seulement dans l'audit.
+     */
+    payload: {
+      sub: string;
+      email: string;
+      jti?: string;
+      platform?: 'mobile' | 'web';
+      impersonated_by?: string;
+    };
+    user: {
+      sub: string;
+      email: string;
+      jti?: string;
+      platform?: 'mobile' | 'web';
+      impersonated_by?: string;
+    };
   }
 }
 

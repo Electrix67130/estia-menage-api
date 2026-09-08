@@ -1021,6 +1021,83 @@ Chaque notification embarque `data: { menage_id, type }` pour router vers le mé
 
 > **URLs de fichiers signées à la lecture** (token TTL 5 min, comme `/files`) : `avatar_url` (`/auth/me` + listes), `cover_photo_url` du logement (liste + détail), `photo_url` des pièces (`/logement-rooms`), `arrival_photo_url`/`departure_photo_url` du ménage (détail, liste, réponses pointage), et `url`/`thumbnail_url` des photos (`/photos`). Les URLs externes (ne contenant pas `/files/`) sont laissées intactes.
 
+## Super admin (console transverse)
+
+Vue sur **toutes les organisations**, réservée au porteur du produit. Garde :
+`user.is_super_admin`, posé **à la main en SQL** — aucune route ne l'accorde, sinon l'élévation de
+privilèges se ferait via l'API. Toute action d'écriture est tracée dans `audit_log`.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET | `/super-admin/overview` | Compteurs orgs / users / ménages + sièges facturables + derniers inscrits |
+| GET | `/super-admin/orgs?q=&page=` | Organisations + nb de membres et de ménages actifs |
+| GET | `/super-admin/orgs/:id` | Détail : membres et 50 derniers ménages |
+| POST | `/super-admin/orgs/:id/enable` · `/disable` | **Kill switch** d'une organisation |
+| POST | `/super-admin/orgs/:id/impersonate` | JWT de 30 min au nom d'un admin de l'org (support) |
+| GET | `/super-admin/users?q=&page=` | Comptes, tous orgs confondues |
+| GET | `/super-admin/users/:id` | Détail : organisations et nb de sessions actives |
+| POST | `/super-admin/users/:id/enable` · `/disable` | Activer / désactiver (désactiver coupe les sessions) |
+| POST | `/super-admin/users/:id/kick-sessions` | Déconnecte tous les appareils |
+| POST | `/super-admin/users/:id/force-reset` | Mot de passe temporaire, renvoyé en clair au super admin |
+| DELETE | `/super-admin/users/:id` | Suppression (400 sur soi-même) |
+| GET | `/super-admin/feedbacks?status=&type=&q=` | Signalements de **toutes** les orgs + `counts` |
+| GET | `/super-admin/feedbacks/:id` | Fiche avec auteur et organisation |
+| PATCH | `/super-admin/feedbacks/:id` | Statut / réponse (push à l'auteur + audit) |
+| GET | `/super-admin/audit?page=` | Journal des actions de super admin |
+| GET | `/super-admin/errors?page=` | Journal des 500 de l'API (« Sentry maison ») |
+
+**Le kill switch éteint vraiment** : `getActiveMembership` ne rend plus de membership pour une org
+`is_active = false`, et toutes les routes métier passent par là. Un utilisateur désactivé, lui, est
+bloqué au login (`auth.service`) **et** ses sessions sont supprimées.
+
+> `error_log` était déjà alimenté par `src/plugins/error-handler.ts` alors que la table n'existait
+> pas : chaque 500 se terminait par un « Failed to write error_log ». La migration
+> `20260908211809_super_admin_setup` corrige ça.
+
+**Activer un super admin** :
+```sql
+UPDATE "user" SET is_super_admin = true WHERE email = 'julien@…';
+```
+
+## Feedback (bugs & suggestions)
+
+Signalements envoyés par les utilisateurs depuis le mobile ou le dashboard. Traitement au niveau de
+l'**organisation** : les admins voient les signalements de leurs membres et y répondent.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| POST | `/feedbacks` | Déposer un bug ou une suggestion (tout utilisateur connecté) |
+| GET | `/feedbacks/mine` | Ses propres signalements + les réponses reçues |
+| GET | `/feedbacks/mine/:id` | Détail d'un de ses signalements (404 si ce n'est pas le sien) |
+| GET | `/feedbacks?status=&type=&q=` | Signalements de l'org, filtrables (**admin**) → `{ data, meta, counts }` |
+| PATCH | `/feedbacks/:id` | Statut et/ou réponse (**admin** de l'org) |
+
+`POST /feedbacks` body :
+```json
+{
+  "type": "bug",
+  "subject": "Les photos n'apparaissent pas",
+  "message": "Depuis ce matin, la galerie reste vide sur le ménage du 12.",
+  "platform": "mobile",
+  "app_version": "0.1.0",
+  "screen": "/menage/[id]",
+  "locale": "fr"
+}
+```
+- `type` ∈ `bug` | `suggestion` · `subject` 3-150 · `message` 10-5000.
+- `platform` / `app_version` / `screen` : contexte technique, facultatif mais précieux — sans lui un
+  bug mobile est irreproductible.
+- `locale` : langue de rédaction, c'est dans celle-là qu'il faut répondre.
+
+`PATCH /feedbacks/:id` body : `{ "status": "in_progress" }` et/ou `{ "response": "…" }` (au moins un
+des deux, sinon 400). **Écrire une réponse passe le statut à `resolved`** si aucun statut n'est
+précisé — répondre, c'est traiter ; `response: null` retire la réponse et son auteur.
+Une réponse **nouvelle** envoie une push à l'auteur (`type: feedback_reply`), volontairement hors des
+catégories de préférences : c'est la réponse à un message qu'il a lui-même écrit, il l'attend.
+
+Statuts : `new` · `in_progress` · `resolved` · `declined`. La liste admin trie `new` d'abord, puis
+`in_progress`, puis le reste — une console se lit par ce qui reste à traiter.
+
 ## Préférences de notifications
 
 Chaque utilisateur peut couper certaines catégories de push. Par défaut tout est activé ; `sendPushToUsers` filtre les destinataires selon leur préférence pour la catégorie du `data.type`.

@@ -270,6 +270,36 @@ Pièces d'un logement, **100% personnalisables** : nom libre + photo de couvertu
 
 INDEX : `(logement_id)`. Auto-génération `generateForLogement` **désactivée** (les pièces ne sont plus créées depuis les compteurs `n_*` du logement).
 
+### `audit_log` / `error_log` (console super admin)
+Ajoutés par la migration 20260908211809, avec `user.is_super_admin` (bool, défaut false, posé en SQL) et `organization.is_active` (bool, défaut true — kill switch).
+
+**audit_log** : `id` PK · `super_admin_id` FK user CASCADE notnull · `action` varchar(100) (`org.disable`, `user.force_reset`, `feedback.respond`…) · `target_type` varchar(50) · `target_id` uuid · `metadata` jsonb · `ip` varchar(45) · `created_at`. INDEX `(super_admin_id, created_at)`, `(target_type, target_id)`.
+
+**error_log** : `id` PK · `level` varchar(10) · `message` text notnull · `stack` text · `route` varchar(500) · `method` varchar(10) · `user_id` FK user SET NULL · `status_code` int · `request_id` varchar(100) · `created_at` (indexé). Alimenté par `src/plugins/error-handler.ts` sur chaque 500.
+
+### `feedback`
+Signalements des utilisateurs : bugs et suggestions (migration 20260908210715). Traités par les **admins de l'organisation** de l'auteur.
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| user_id | uuid FK user CASCADE notnull | auteur ; supprimer le compte efface ses signalements |
+| organization_id | uuid FK organization SET NULL | org au moment de l'envoi = qui traite |
+| type | varchar(20) notnull | `bug` ou `suggestion` |
+| subject | varchar(150) notnull | |
+| message | text notnull | |
+| status | varchar(20) notnull | `new` / `in_progress` / `resolved` / `declined` (défaut `new`) |
+| platform | varchar(20) | `mobile` ou `web` |
+| app_version | varchar(40) | version installée — savoir si un correctif est bien arrivé |
+| screen | varchar(200) | écran/page d'origine |
+| locale | varchar(5) notnull | langue de rédaction, défaut `fr` |
+| response | text | réponse de l'admin, visible par l'auteur |
+| responded_by | uuid FK user SET NULL | |
+| responded_at | timestamp | |
+| created_at, updated_at | timestamp | |
+
+INDEX : `(organization_id, status, created_at)` (lecture de la console), `(user_id)`.
+
 ### `logement_option` / `menage_option`
 Options proposées au client sur un logement (pack romantique, pack anniversaire…) et options retenues pour une prestation (migration 20260907202719). **Admin only** en écriture ; le prestataire consulte.
 
@@ -636,6 +666,7 @@ organization (id)
 └─ invitation (organization_id) → user (invited_by)
 
 user
+├─ feedback (user_id, organization_id?) — bugs & suggestions
 ├─ refresh_token
 ├─ device_token (user_id) — tokens push Expo (multi-device)
 └─ menage (prestataire_user_id, validated_by)
