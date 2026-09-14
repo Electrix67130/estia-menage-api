@@ -172,13 +172,23 @@ export async function sendPushToUsers(
 async function menageLabel(
   db: Knex,
   menageId: string,
-): Promise<{ dateLabel: string; lieu: string; logementId: string } | null> {
+): Promise<{ dateLabel: string; horaire: string | null; lieu: string; logementId: string } | null> {
   const menage = (await db('menage')
     .leftJoin('logement', 'menage.logement_id', 'logement.id')
     .where('menage.id', menageId)
-    .select('menage.date_prevue', 'menage.logement_id', 'logement.name as logement_name')
+    .select(
+      'menage.date_prevue',
+      'menage.horaire_prevu',
+      'menage.logement_id',
+      'logement.name as logement_name',
+    )
     .first()) as
-    | { date_prevue: string; logement_id: string; logement_name: string | null }
+    | {
+        date_prevue: string;
+        horaire_prevu: string | null;
+        logement_id: string;
+        logement_name: string | null;
+      }
     | undefined;
   if (!menage) return null;
   const dateLabel = new Date(menage.date_prevue).toLocaleDateString('fr-FR', {
@@ -188,6 +198,8 @@ async function menageLabel(
   });
   return {
     dateLabel,
+    // La colonne est un TIME (« 09:00:00 ») : on n'affiche que HH:MM.
+    horaire: menage.horaire_prevu ? String(menage.horaire_prevu).slice(0, 5) : null,
     lieu: menage.logement_name ? ` — ${menage.logement_name}` : '',
     logementId: menage.logement_id,
   };
@@ -213,7 +225,13 @@ export async function notifyMenageAssignment(
   });
 }
 
-/** Ménage modifié (date/horaire) → prestataires assignés. */
+/**
+ * Ménage reporté (date et/ou horaire) → prestataires assignés.
+ *
+ * Le corps annonce la **nouvelle** date : c'est l'information utile d'un
+ * report, et sans elle il faut ouvrir l'application pour savoir quand venir.
+ * `menageLabel` relit le ménage après la mise à jour, donc la date est la bonne.
+ */
 export async function notifyMenageUpdated(
   db: Knex,
   menageId: string,
@@ -222,9 +240,10 @@ export async function notifyMenageUpdated(
   if (userIds.length === 0) return;
   const label = await menageLabel(db, menageId);
   if (!label) return;
+  const quand = label.horaire ? `${label.dateLabel} à ${label.horaire}` : label.dateLabel;
   await sendPushToUsers(db, userIds, {
-    title: 'Ménage modifié',
-    body: `${label.dateLabel}${label.lieu} · la date ou l'horaire a changé`,
+    title: 'Ménage reporté',
+    body: `Nouvelle date : ${quand}${label.lieu}`,
     data: { menage_id: menageId, type: 'updated' },
   });
 }

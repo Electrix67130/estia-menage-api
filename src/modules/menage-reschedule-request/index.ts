@@ -7,7 +7,7 @@ import {
   listRescheduleRequestsSchema,
 } from './menage-reschedule-request.schema';
 import { getActiveMembership } from '@/lib/active-membership';
-import { sendPushToUsers, notifyRescheduleCancelled } from '@/lib/push';
+import { sendPushToUsers, notifyRescheduleCancelled, notifyMenageUpdated } from '@/lib/push';
 
 const uuidSchema = z.object({ id: z.string().uuid() });
 
@@ -163,9 +163,12 @@ export default fp(
           data.apply_to_menage,
         );
 
+        const approved = data.decision === 'approved';
+
         // Notification push au prestataire qui a fait la demande.
         if (existing.requested_by !== request.user.sub) {
-          const approved = data.decision === 'approved';
+          // La date affichée est celle d'AVANT le report : c'est ainsi que le
+          // demandeur reconnaît sa demande.
           const dateLabel = new Date(menage.date_prevue).toLocaleDateString('fr-FR', {
             day: 'numeric',
             month: 'long',
@@ -177,6 +180,21 @@ export default fp(
               : `Ta demande pour le ménage du ${dateLabel} a été refusée.`,
             data: { menage_id: existing.menage_id, type: 'reschedule_decision' },
           }).catch((err) => fastify.log.error({ err }, 'push reschedule decide failed'));
+        }
+
+        // Un report accepté déplace la prestation : les AUTRES prestataires
+        // affectés doivent connaître la nouvelle date, ils n'ont rien demandé
+        // et ne reçoivent pas la réponse ci-dessus.
+        if (approved && data.apply_to_menage !== false) {
+          (async () => {
+            const affectes = (await fastify.db('menage_prestataire')
+              .where({ menage_id: existing.menage_id })
+              .select('user_id')) as { user_id: string }[];
+            const autres = affectes
+              .map((a) => a.user_id)
+              .filter((uid) => uid !== existing.requested_by && uid !== request.user.sub);
+            await notifyMenageUpdated(fastify.db, existing.menage_id, autres);
+          })().catch((err) => fastify.log.error({ err }, 'push reschedule applied failed'));
         }
 
         return updated;

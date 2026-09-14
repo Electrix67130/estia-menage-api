@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { toYmd, todayYmd } from '@/lib/date';
 
 export const menageStatusEnum = z.enum(['a_venir', 'en_cours', 'termine', 'valide', 'annule']);
 export type MenageStatus = z.infer<typeof menageStatusEnum>;
@@ -300,15 +301,10 @@ export function computeNeedsAttention(
   if (menage.arrived_at) return false;
   if (!menage.date_prevue) return false;
   // `date_prevue` (colonne DATE) peut arriver comme objet Date (node-pg) ou
-  // comme chaîne — on normalise dans les deux cas en `YYYY-MM-DD`.
-  const raw: unknown = menage.date_prevue;
-  const datePart =
-    raw instanceof Date ? raw.toISOString().slice(0, 10) : String(raw).slice(0, 10);
-  const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
-    now.getDate(),
-  ).padStart(2, '0')}`;
-  return datePart < today;
+  // comme chaîne. `toYmd` la lit en heure LOCALE : la lire en UTC reculait d'un
+  // jour depuis Paris, et signalait « non pointé » dès le matin même.
+  const datePart = toYmd(menage.date_prevue);
+  return datePart !== null && datePart < todayYmd();
 }
 
 export function serializeMenageForRole(

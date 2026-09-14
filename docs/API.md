@@ -1000,7 +1000,8 @@ Enregistrement des tokens push Expo par appareil (multi-device). L'API envoie le
 - **Ménage annulé** → prestataires assignés (`PATCH status=annule`, `DELETE /menages/:id`, **annulation par sync iCal**).
 - **Ménage retiré** (désassignation) → prestataire retiré (`DELETE /menages/:id/prestataires/:user_id`, `PUT` full-replace, `PATCH` legacy).
 - **Demande de report** → admins de l'org (`POST /reschedule-requests`).
-- **Report accepté/refusé** → prestataire demandeur (`POST /reschedule-requests/:id/decide`).
+- **Report accepté/refusé** → prestataire demandeur (`POST /reschedule-requests/:id/decide`). Si le report est **accepté et appliqué**, les **autres prestataires affectés** reçoivent en plus « Ménage reporté » avec la nouvelle date.
+- **Ménage annulé / reporté** → prestataires affectés, hors auteur de l'action (`PATCH /menages/:id` sur `status`/`date_prevue`/`horaire_prevu`, `DELETE /menages/:id`, annulation par la sync iCal). Le report annonce la nouvelle date et l'heure. La détection normalise les deux côtés (`toYmd` / `toHhmm`) : sinon un formulaire renvoyant tous les champs déclenchait une fausse notification de report à chaque enregistrement.
 - **Report annulé** → admins de l'org (`POST /reschedule-requests/:id/cancel`).
 - **Réponse présent/absent** → admins de l'org (`POST /menages/:id/responses`), **uniquement si le statut change** : re-poster la même réponse (re-clic, re-confirmation après affectation) ne renvoie pas de push.
 - **Prestataire arrivé / ménage terminé** → admins de l'org (`POST /menages/:id/arrival` · `/departure`).

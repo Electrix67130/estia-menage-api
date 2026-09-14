@@ -52,6 +52,25 @@ describe('computeNeedsAttention', () => {
       }),
     ).toBe(true);
   });
+
+  it('ne signale pas le ménage du jour rendu en Date à minuit local', () => {
+    // node-pg rend une colonne DATE à minuit LOCAL. Lue en UTC depuis Paris,
+    // elle reculait d'un jour : tout ménage du jour non encore pointé
+    // s'affichait « non pointé » dès le matin, avant même d'être en retard.
+    const aujourdhui = new Date();
+    const minuitLocal = new Date(
+      aujourdhui.getFullYear(),
+      aujourdhui.getMonth(),
+      aujourdhui.getDate(),
+    );
+    expect(
+      computeNeedsAttention({
+        status: 'a_venir',
+        date_prevue: minuitLocal as unknown as string,
+        arrived_at: null,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('serializeMenageForRole', () => {

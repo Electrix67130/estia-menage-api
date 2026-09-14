@@ -30,6 +30,7 @@ import {
   notifyMenageValidated,
 } from '@/lib/push';
 import { signUrlsInList, signFields } from '@/lib/sign-url';
+import { toHhmm, toYmd } from '@/lib/date';
 
 const uuidSchema = z.object({ id: z.string().uuid() });
 
@@ -357,11 +358,18 @@ export default fp(
         }
       }
 
-      // Notifs aux prestataires assignés (hors auteur) sur modif de date/horaire
+      // Notifs aux prestataires assignés (hors auteur) sur report de date/horaire
       // ou annulation du ménage.
+      //
+      // Les deux côtés sont normalisés avant comparaison : `date_prevue` revient
+      // de node-pg en objet Date alors que le payload envoie « 2026-07-01 », et
+      // `horaire_prevu` est un TIME (« 09:00:00 ») face à un « 09:00 ». Comparés
+      // bruts, ces champs paraissaient TOUJOURS modifiés : un simple changement
+      // de prix depuis un formulaire qui renvoie tout déclenchait une fausse
+      // notification de report.
       const dateTimeChanged =
-        ('date_prevue' in data && data.date_prevue !== existing.date_prevue) ||
-        ('horaire_prevu' in data && data.horaire_prevu !== existing.horaire_prevu);
+        ('date_prevue' in data && toYmd(data.date_prevue) !== toYmd(existing.date_prevue)) ||
+        ('horaire_prevu' in data && toHhmm(data.horaire_prevu) !== toHhmm(existing.horaire_prevu));
       const justCancelled =
         'status' in data && data.status === 'annule' && existing.status !== 'annule';
       if (dateTimeChanged || justCancelled) {
