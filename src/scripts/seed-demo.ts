@@ -280,6 +280,30 @@ async function main(): Promise<void> {
         }
       }
 
+      // Options retenues et équipements à préparer : sans eux, deux sections du
+      // détail restent masquées, et le relecteur ne voit pas ces fonctionnalités.
+      if (p.status === 'a_venir' && p.type === 'menage') {
+        const equipements = (await db('logement_equipement')
+          .where({ logement_id: logement.id })
+          .whereIn('label', ['Chaise haute', 'Appareil à raclette'])
+          .select('id')) as { id: string }[];
+        if (equipements.length > 0) {
+          await db('menage_equipement').insert(
+            equipements.map((e) => ({ menage_id: menage.id, logement_equipement_id: e.id })),
+          );
+        }
+        const option = (await db('logement_option')
+          .where({ logement_id: logement.id, label: 'Pack romantique' })
+          .first()) as { id: string } | undefined;
+        if (option) {
+          await db('menage_option').insert({
+            menage_id: menage.id,
+            logement_option_id: option.id,
+            notes: 'Arrivée prévue vers 18 h',
+          });
+        }
+      }
+
       if (p.status === 'termine') {
         await db('comment').insert({
           menage_id: menage.id,
