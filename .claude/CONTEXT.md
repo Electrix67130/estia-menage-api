@@ -17,6 +17,8 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 | **Dashboard** (admin web) | `estia-menage-dashboard` | Next.js (App Router) | tag git `[0-9]*` → CI SSH → VPS | dernier tag **0.1.83** |
 | **Mobile** (presta + admin) | `estia-menage-ui` | Expo SDK 54 + EAS | **OTA** `eas update --branch production --environment production` (JS) · build natif = TestFlight | runtime **0.1.0**, TestFlight **0.1.0 (19)** · bundle `fr.estiacleanconnect.app` |
 
+> ⚠️ **Publier une OTA : `npm run ota`** (et non `eas update` à la main). Ce script lance d'abord `scripts/check-ota-safe.mjs`, qui **bloque la publication si une dépendance native a été ajoutée depuis le dernier build natif** — une OTA ne livre que du JS, et un module natif absent du binaire fait planter l'écran qui l'importe, sans aucun signal au build ni à la publication. Vécu avec `expo-haptics` (ajouté le 21/07, binaire du 02/07) : deux mois de crashs sur l'onglet Calendrier. Deux issues quand il bloque : lancer un build natif, ou charger le module paresseusement (modèle : `src/lib/haptics.ts`). Contournement conscient : `OTA_GUARD_SKIP=1`.
+>
 > ⚠️ **OTA mobile — toujours `--environment production`.** Sans ce flag, `eas update` inline le `.env` **local** (`EXPO_PUBLIC_API_URL`/`_API_KEY` = localhost) dans le bundle prod → l'app pointe vers l'API locale et le login casse. Les vraies valeurs sont dans les variables d'env EAS (environment `production`).
 
 **Parité** : toute feature doit être déclinée dashboard **et** mobile quand elle concerne les deux (sauf facturation/gains = dashboard-only).
