@@ -444,6 +444,23 @@ sudo systemctl reload caddy
 > Le certificat Let's Encrypt est obtenu automatiquement, **à condition que le
 > DNS pointe déjà** sur le VPS : faire 4bis.2 avant de recharger Caddy.
 
+> ⚠️ **Ne jamais lancer `caddy start` / `caddy stop` sur le VPS**, même avec un
+> `--config` pointant sur un fichier de test. Ces commandes parlent à l'API
+> d'administration de Caddy (`localhost:2019`), qui appartient à l'instance
+> systemd : `caddy stop` a **éteint le reverse proxy de production** le
+> 2026-09-16 (API et dashboard injoignables une minute, le temps de faire
+> `systemctl restart caddy`). Pour tester une configuration sans toucher à la
+> production, utiliser un fichier avec `admin off` + `auto_https off` sur un
+> port interne, lancé en avant-plan :
+>
+> ```bash
+> sudo timeout 25 caddy run --config /tmp/test.Caddyfile --adapter caddyfile
+> curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8088/support/
+> ```
+>
+> Et pour recharger la vraie configuration : `sudo systemctl reload caddy`,
+> précédé de `sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`.
+
 ### 4bis.4 Activer la CI
 
 Le workflow `estia-menage-website` construit l'export, l'envoie en `scp` puis
