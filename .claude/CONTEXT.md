@@ -1,6 +1,6 @@
 # Contexte produit — Estia Clean Connect
 
-> Carte fonctionnelle de TOUT le produit (les 3 apps). Lue automatiquement à chaque session.
+> Carte fonctionnelle de TOUT le produit (les 4 apps). Lue automatiquement à chaque session.
 > **À mettre à jour à chaque modification fonctionnelle** (nouvelle feature, changement de flux, déploiement).
 > Rester concis : c'est une vue d'ensemble, pas la doc détaillée (voir `docs/API.md`, `docs/MCD.md`).
 
@@ -9,13 +9,14 @@
 Gestion de prestations de ménage pour conciergerie de locations courte durée (Airbnb…).
 Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque intervention datée = une **prestation** (ménage, check-in ou check-out).
 
-## Les 3 apps (repos séparés)
+## Les 4 apps (repos séparés)
 
 | App | Repo | Stack | Déploiement | État |
 |---|---|---|---|---|
-| **API** | `estia-menage-api` | Fastify + Knex (PostgreSQL) + Zod + TS | tag git `[0-9]*` → CI SSH → VPS (docker build + `npm run migrate`) | dernier tag **0.1.63** · `api.estia-clean-connect.fr` |
+| **API** | `estia-menage-api` | Fastify + Knex (PostgreSQL) + Zod + TS | tag git `[0-9]*` → CI SSH → VPS (docker build + `npm run migrate`) | dernier tag **0.1.69** · `api.estia-clean-connect.fr` |
 | **Dashboard** (admin web) | `estia-menage-dashboard` | Next.js (App Router) | tag git `[0-9]*` → CI SSH → VPS | dernier tag **0.1.83** |
 | **Mobile** (presta + admin) | `estia-menage-ui` | Expo SDK 54 + EAS | **OTA** `eas update --branch production --environment production` (JS) · build natif = TestFlight | runtime **0.1.0**, TestFlight **0.1.0 (19)** · bundle `fr.estiacleanconnect.app` |
+| **Vitrine** (site public) | `estia-menage-website` | Next.js 16 en export statique (`out/`) | tag git `[0-9]*` → CI build + `scp` → VPS (Caddy sert les fichiers) | **pas encore en ligne** · `estia-clean-connect.fr` (domaine déposé, apex à router) |
 
 > ⚠️ **Publier une OTA : `npm run ota`** (et non `eas update` à la main). Ce script lance d'abord `scripts/check-ota-safe.mjs`, qui **bloque la publication si une dépendance native a été ajoutée depuis le dernier build natif** — une OTA ne livre que du JS, et un module natif absent du binaire fait planter l'écran qui l'importe, sans aucun signal au build ni à la publication. Vécu avec `expo-haptics` (ajouté le 21/07, binaire du 02/07) : deux mois de crashs sur l'onglet Calendrier. Deux issues quand il bloque : lancer un build natif, ou charger le module paresseusement (modèle : `src/lib/haptics.ts`). Contournement conscient : `OTA_GUARD_SKIP=1`.
 >
@@ -56,6 +57,7 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 - **Options / packs** (`logement_option` + `menage_option`) : packs proposés au client sur un logement (**pack romantique**, **pack anniversaire**, panier gourmand…), configurés par l'admin dans la fiche logement (libellé libre + description « à installer », suggestions servies par l'API). Sur une prestation, l'admin coche **l'option retenue par le client** ; elle s'affiche en évidence sur le détail (dashboard + mobile) pour que le prestataire l'installe — **lecture seule côté presta**, comme les équipements à préparer. `PUT /menages/:id/options` = admin only.
 - **Inventaire des équipements** par logement (`logement_equipement`) : ce dont le bien est équipé (appareil à raclette/fondue, plaque de cuisson, lave-vaisselle…). **Écriture admin, lecture par tous les membres** (le presta doit savoir ce qu'il trouvera sur place). Chaque ligne = libellé libre + **famille** (cuisine/électroménager/confort/extérieur/loisirs/bébé/sécurité/autre) + quantité + **pièce** optionnelle (`logement_room_id`) + notes. Deux modes d'ajout, **dashboard + mobile** : le **catalogue** (`GET /logement-equipements/catalog`, suggestions servies par l'API donc identiques sur les 2 apps → sélection multiple, ajout groupé idempotent via `POST /logement-equipements/bulk`) ou la saisie libre. Affiché groupé par famille sur la fiche logement.
 - **Console super admin** (`/super-admin/*`, dashboard `/admin/*`) : vue transverse à toutes les organisations, réservée au porteur du produit via `user.is_super_admin` (posé **à la main en SQL**, aucune route ne l'accorde). Vue d'ensemble (orgs/users/ménages + sièges facturables), gestion des **organisations** (kill switch `is_active`, impersonation 30 min pour le support), des **comptes** (activer/désactiver, couper les sessions, mot de passe temporaire, suppression), **signalements toutes orgs**, **journal d'audit** (toute action de super admin est tracée) et **journal d'erreurs** (les 500 de l'API). Le kill switch éteint réellement : `getActiveMembership` ne rend plus rien pour une org désactivée. Les pages du dashboard existaient déjà mais appelaient des endpoints inexistants — l'API est désormais en face.
+- **Site vitrine** (`estia-clean-connect.fr`) : présentation du produit (accueil, fonctionnalités, comment ça marche, tarifs **sur devis**, contact) en **8 langues**, plus les deux pages **exigées par l'App Store** — `/support` (aide, contact, suppression de compte) et `/privacy` (RGPD) — et `/legal` (mentions légales). **Export statique** (`output: "export"`, ~2 Mo) servi par Caddy : pas de Node sur le VPS, dont le disque est déjà occupé à 80 %. Le contenu ne parle **pas que de conciergerie** : conciergeries courte durée, sociétés de nettoyage, propriétaires multi-biens. Les pages légales restent **en français** (le responsable de traitement l'est), avec une mention dans la langue du lecteur. Toutes les URLs et l'identité légale viennent de `src/lib/site.ts`. ⚠️ **À compléter avant mise en ligne** : `LEGAL_IDENTITY` (SIRET, siège, directeur de publication). ⚠️ Tant que le site n'est pas en ligne, la fiche App Store pointe `supportUrl`/`privacyPolicyUrl` sur `api.estia-clean-connect.fr` — bascule par simple `eas metadata:push`, sans rebuild.
 - **Consommables** par logement + alertes sous seuil.
 - **Facturation** (dashboard, admin) : factures/devis regroupant les ménages par client+période, PDF, export CSV, statuts, numérotation légale ; récap « à payer prestataires ».
 - **Gains** (dashboard, admin) : par semaine/mois/année/tout → **CA client (HT)** · **à payer (coût presta)** · **marge** ; ventilation par client et par prestataire ; clic presta → détail de ses prestations ; bouton **« Facturer »** (deep-link vers création de facture pré-remplie).

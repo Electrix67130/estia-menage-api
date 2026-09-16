@@ -385,6 +385,102 @@ docker system df          # colonne RECLAIMABLE = ce qu'un prune libérerait
 
 ---
 
+## 4 bis. Site vitrine statique (20 min)
+
+Le site `estia-clean-connect.fr` (repo `estia-menage-website`) porte la
+présentation du produit **et les deux pages exigées par l'App Store**
+(`/support`, `/privacy`).
+
+> **Pourquoi pas un troisième service Node ?** Le site n'a ni API ni rendu
+> serveur : il est construit en `output: "export"`, soit ~2 Mo de fichiers. Le
+> VPS n'a que 7,9 Go de disque, déjà occupés à 80 % — y installer un
+> `node_modules` de plus (~500 Mo) pour servir du HTML figé n'aurait aucun
+> sens. La CI construit, le VPS ne fait que servir.
+
+### 4bis.1 Préparer le répertoire
+
+```bash
+# Sur le VPS. /srv plutot que /home/estia : Caddy tourne sous son propre
+# utilisateur et doit pouvoir traverser le repertoire.
+sudo mkdir -p /srv/estia-site/versions
+sudo chown -R estia:estia /srv/estia-site
+sudo chmod 755 /srv /srv/estia-site
+```
+
+### 4bis.2 Pointer le DNS
+
+Le domaine est déposé chez **Scaleway**, mais l'apex n'était pas routé. Ajouter
+dans la zone :
+
+```
+estia-clean-connect.fr       A   <IP_VPS>
+www.estia-clean-connect.fr   A   <IP_VPS>
+```
+
+### 4bis.3 Ajouter le bloc Caddy
+
+```bash
+sudo tee -a /etc/caddy/Caddyfile >/dev/null <<'EOF'
+
+estia-clean-connect.fr {
+    root * /srv/estia-site/courant
+    encode gzip zstd
+    try_files {path} {path}/ {path}.html
+    file_server
+    handle_errors {
+        rewrite * /404.html
+        file_server
+    }
+}
+
+www.estia-clean-connect.fr {
+    redir https://estia-clean-connect.fr{uri} permanent
+}
+EOF
+
+sudo systemctl reload caddy
+```
+
+> Le certificat Let's Encrypt est obtenu automatiquement, **à condition que le
+> DNS pointe déjà** sur le VPS : faire 4bis.2 avant de recharger Caddy.
+
+### 4bis.4 Activer la CI
+
+Le workflow `estia-menage-website` construit l'export, l'envoie en `scp` puis
+exécute `scripts/install-site.sh` (versionné dans le repo, pas sur le VPS) qui
+dépose la version dans `/srv/estia-site/versions/<horodatage>` et bascule le
+lien `courant` de façon atomique. Les 3 dernières versions sont conservées —
+un retour arrière est un simple :
+
+```bash
+ln -sfn /srv/estia-site/versions/<version_precedente> /srv/estia-site/courant.tmp
+mv -T /srv/estia-site/courant.tmp /srv/estia-site/courant
+```
+
+Une fois 4bis.1 à 4bis.3 faits, passer la variable de repo `DEPLOY_ENABLED` à
+`true` sur `estia-menage-website`, puis pousser un tag (`git tag 0.1.0 && git
+push origin 0.1.0`).
+
+### 4bis.5 Basculer la fiche App Store
+
+Tant que le site n'est pas en ligne, `store.config.json` (repo mobile) pointe
+`supportUrl` et `privacyPolicyUrl` sur `api.estia-clean-connect.fr` — les deux
+pages HTML servies par l'API (`src/lib/web-pages.ts`). Une fois le site en
+ligne :
+
+```bash
+# Dans estia-menage-ui, remplacer les deux URLs par
+#   https://estia-clean-connect.fr/support/
+#   https://estia-clean-connect.fr/privacy/
+npx eas metadata:push
+```
+
+Ce sont des **métadonnées de fiche** : pas besoin de rebuild ni de resoumettre
+un binaire. Garder les routes `/support` et `/privacy` de l'API en place : les
+anciennes versions de la fiche et les liens déjà diffusés y pointent encore.
+
+---
+
 ## 5. Mobile iOS (3h setup initial)
 
 **Apple Developer + EAS Build (free tier)**
