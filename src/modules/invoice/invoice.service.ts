@@ -1,4 +1,5 @@
 import { Knex } from 'knex';
+import { todayYmd, toYmd } from '@/lib/date';
 import { GenerateInvoice, InvoiceRow, InvoiceLineRow, UpdateInvoice } from './invoice.schema';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -17,7 +18,9 @@ class InvoiceService {
   constructor(private db: Knex) {}
 
   private fmtDate(d: string | Date): string {
-    const s = typeof d === 'string' ? d.slice(0, 10) : d.toISOString().slice(0, 10);
+    // `toYmd` lit une colonne DATE en heure locale : la lire en UTC décalait le
+    // libellé d'un jour depuis Paris (« Ménage du 30/06 » pour un ménage du 1er).
+    const s = toYmd(d) as string;
     const [y, m, day] = s.split('-');
     return `${day}/${m}/${y}`;
   }
@@ -113,7 +116,7 @@ class InvoiceService {
           client_id: data.client_id,
           type: data.type,
           status: 'draft',
-          issue_date: new Date().toISOString().slice(0, 10),
+          issue_date: todayYmd(),
           due_date: data.due_date ?? null,
           period_start: data.period_start ?? null,
           period_end: data.period_end ?? null,
@@ -157,7 +160,10 @@ class InvoiceService {
 
   /** Attribue le prochain numéro séquentiel (sans trou) pour (org, type, année). */
   private async assignNumber(trx: Knex.Transaction, invoice: InvoiceRow): Promise<string> {
-    const year = (invoice.issue_date ?? new Date().toISOString().slice(0, 10)).slice(0, 4);
+    // L'année de la numérotation suit la date d'émission, elle aussi locale :
+    // une facture émise le 1er janvier à 00 h 30 ne doit pas porter l'année
+    // précédente.
+    const year = (toYmd(invoice.issue_date) ?? todayYmd()).slice(0, 4);
     const prefix = invoice.type === 'quote' ? `D${year}-` : `${year}-`;
     // Verrou : on lit les numéros existants de l'année pour ce type, en FOR UPDATE.
     const rows = (await trx('invoice')

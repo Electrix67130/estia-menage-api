@@ -177,6 +177,33 @@ describe('pointage de départ', () => {
     expect(jour).toBe('2026-07-01');
   });
 
+  it('date la réalisation au jour local, pas au jour UTC', async () => {
+    // Un départ pointé à 00 h 30 heure de Paris tombe la veille en UTC. Lue
+    // ainsi, la date de réalisation reculait d'un jour — et c'est elle qui
+    // alimente les gains et la facturation.
+    const { presta, menageId } = await contexte();
+    await app.inject({
+      method: 'POST',
+      url: `/menages/${menageId}/arrival`,
+      headers: auth(presta.token),
+      payload: preuve,
+    });
+
+    // 1er juillet 00 h 30 à Paris (UTC+2) = 30 juin 22 h 30 UTC.
+    const departMinuitPasse = new Date(2026, 6, 1, 0, 30, 0).toISOString();
+    await app.inject({
+      method: 'POST',
+      url: `/menages/${menageId}/departure`,
+      headers: auth(presta.token),
+      payload: { ...preuve, departed_at: departMinuitPasse },
+    });
+
+    const [{ jour }] = await app.db('menage')
+      .where({ id: menageId })
+      .select(app.db.raw("to_char(date_realisation, 'YYYY-MM-DD') as jour"));
+    expect(jour).toBe('2026-07-01');
+  });
+
   it('reste fermé à un prestataire non affecté', async () => {
     const { organizationId, logementId, menageId } = await contexte();
     const autre = await createUser(app, { organizationId, role: 'prestataire' });

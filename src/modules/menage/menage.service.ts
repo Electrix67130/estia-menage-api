@@ -1,4 +1,5 @@
 import { Knex } from 'knex';
+import { toYmd } from '@/lib/date';
 import BaseService, { PaginatedResult } from '@/lib/base-service';
 import { MenageRow, ListMenagesQuery } from './menage.schema';
 import { generateChecklistForMenage } from '@/modules/menage-check/menage-check.service';
@@ -325,8 +326,11 @@ class MenageService extends BaseService<MenageRow> {
   ): Promise<MenageRow | undefined> {
     const now = new Date();
     const departed = departedAt ? new Date(departedAt) : now;
-    // Date de réalisation = jour réel du départ (pas le jour de la synchro).
-    const today = departed.toISOString().slice(0, 10);
+    // Date de réalisation = jour réel du départ (pas le jour de la synchro), lu
+    // en heure LOCALE : `toISOString` aurait daté de la veille tout départ
+    // pointé entre minuit et 2 h du matin depuis Paris — et cette date alimente
+    // les gains et la facturation.
+    const today = toYmd(departed) as string;
     const update: Record<string, unknown> = {
       departed_at: departed,
       date_realisation: today,
