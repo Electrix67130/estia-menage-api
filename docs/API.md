@@ -430,6 +430,8 @@ Filtre `unassigned=true` : ne retourne que les ménages sans prestataire (utile 
 
 Filtre `closed` : `closed=true` = uniquement les ménages clôturés (`valide`/`annule`) → Archives ; `closed=false` = worklist active (exclut `valide`/`annule`). Combinable avec `logement_id`, `prestataire_user_id`, `from`/`to`, pagination.
 
+Filtre `stale_before=YYYY-MM-DD` (avec `closed=true`) : l'Historique inclut **aussi** les prestations **non clôturées** dont `date_prevue` est strictement antérieure à cette date — les « oubliées » (jamais validées / jamais pointées) qui ne doivent plus encombrer la liste de travail mais rester retrouvables. Le mobile passe `aujourd'hui − 30 j`. Ignoré sans `closed=true`.
+
 **Scope de visibilité (non-admin) sur `GET /menages` et `GET /menages/:id`** : un ménage **assigné** à un prestataire n'est **plus visible par les AUTRES prestataires**, même membres du logement. Un non-admin voit un ménage si : (1) il en est le **référent** (`prestataire_user_id`), (2) il est **co-prestataire** (`menage_prestataire`), (3) il est membre `manager`/`client_proprietaire` du logement (→ vue complète, soumise à ses permissions), ou (4) il est membre `prestataire` du logement **et le ménage est non-assigné** (`prestataire_user_id IS NULL`, à prendre). Le détail (`GET /menages/:id`) applique la même règle : un membre `prestataire` non-affecté reçoit **404** sur un ménage assigné à un autre.
 
 Filtre `assigned=me` : ne retourne que les prestations où l'utilisateur courant est **affecté** — référent (`prestataire_user_id`) **OU** co-prestataire (`menage_prestataire`). Prime sur le scope par défaut ci-dessus et ne garde que ce que l'utilisateur a réellement fait. Utilisé par l'historique presta (mobile).

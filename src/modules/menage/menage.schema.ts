@@ -182,6 +182,11 @@ export const listMenagesSchema = z.object({
   assigned: z.literal('me').optional(),
   from: z.string().optional(),
   to: z.string().optional(),
+  /** Avec `closed=true` : inclut AUSSI les prestations **non clôturées** dont la
+   *  date est antérieure à cette date (YYYY-MM-DD). Sert à l'Historique : une
+   *  prestation passée depuis longtemps mais jamais validée/pointée n'a plus sa
+   *  place dans la liste de travail, elle doit rester retrouvable ici. */
+  stale_before: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).default(20),
   orderBy: z.string().optional().default('date_prevue'),

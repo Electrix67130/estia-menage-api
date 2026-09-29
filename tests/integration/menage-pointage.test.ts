@@ -312,3 +312,28 @@ describe('validation du rapport', () => {
     expect(historique.json().data).toHaveLength(1);
   });
 });
+
+describe('historique — prestations passées oubliées (stale_before)', () => {
+  it('inclut les non clôturées plus anciennes que la date, pas les récentes', async () => {
+    const { organizationId, admin } = await createOrgWithAdmin(app, 'Conciergerie');
+    const logementId = await createLogement(app, { organizationId, createdBy: admin.id });
+    const base = { logementId, organizationId, createdBy: admin.id };
+    const oubliee = await createMenage(app, { ...base, datePrevue: '2026-07-01', status: 'a_venir' });
+    const recente = await createMenage(app, { ...base, datePrevue: '2026-09-20', status: 'termine' });
+    const validee = await createMenage(app, { ...base, datePrevue: '2026-09-25', status: 'valide' });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/menages?closed=true&stale_before=2026-08-30',
+      headers: auth(admin.token),
+    });
+    const ids = res.json().data.map((m: { id: string }) => m.id);
+    expect(ids).toContain(oubliee);
+    expect(ids).toContain(validee);
+    expect(ids).not.toContain(recente);
+
+    // Sans stale_before : comportement historique inchangé (clôturées seules).
+    const seul = await app.inject({ method: 'GET', url: '/menages?closed=true', headers: auth(admin.token) });
+    expect(seul.json().data.map((m: { id: string }) => m.id)).toEqual([validee]);
+  });
+});

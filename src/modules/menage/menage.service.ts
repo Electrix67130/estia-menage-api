@@ -76,6 +76,7 @@ class MenageService extends BaseService<MenageRow> {
       restrictToAssignee,
       from,
       to,
+      stale_before,
     } = options;
 
     // Filters communs aux deux requêtes (count + data) — pas de joins ici pour que
@@ -90,7 +91,20 @@ class MenageService extends BaseService<MenageRow> {
       if (validated === false) qb.whereNull('menage.validated_at');
       if (unassigned === true) qb.whereNull('menage.prestataire_user_id');
       if (unassigned === false) qb.whereNotNull('menage.prestataire_user_id');
-      if (closed === true) qb.whereIn('menage.status', ['valide', 'annule']);
+      if (closed === true && stale_before) {
+        // Historique = clôturées OU passées « oubliées » (jamais validées/pointées
+        // depuis plus de N jours) : elles sortent de la liste de travail mais
+        // doivent rester retrouvables.
+        qb.where((b) =>
+          b
+            .whereIn('menage.status', ['valide', 'annule'])
+            .orWhere((b2) =>
+              b2.whereNotIn('menage.status', ['valide', 'annule']).where('menage.date_prevue', '<', stale_before),
+            ),
+        );
+      } else if (closed === true) {
+        qb.whereIn('menage.status', ['valide', 'annule']);
+      }
       if (closed === false) qb.whereNotIn('menage.status', ['valide', 'annule']);
       if (from) qb.where('menage.date_prevue', '>=', from);
       if (to) qb.where('menage.date_prevue', '<=', to);
