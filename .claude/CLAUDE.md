@@ -37,6 +37,14 @@ npm run test:db:down     # L'arrete
   d'office), `truncateAll()` (entre chaque test) et les fabriques (`createOrgWithAdmin`,
   `createUser`, `createSuperAdmin`, `createLogement`, `createMenage`...).
 - Les fichiers d'integration s'executent **en serie** : ils partagent une base.
+- `createTestApp()` fait partir chaque requete injectee d'une IP distincte : le
+  limiteur global (100 req/min) ne compte donc pas, un fichier peut enchainer
+  autant de requetes qu'il veut. Les push sont captures au niveau de `fetch`
+  (`capturerPush`) ; les e-mails via `vi.mock('@/lib/mailer')` + `vi.hoisted`
+  (modele : `tests/integration/auth.test.ts`).
+- Un test qui revele un bug du code source reste en `it.todo` avec le
+  fichier:ligne et le comportement attendu/observe en commentaire — on ne
+  corrige pas le source depuis la suite de tests.
 - La CI joue `npx tsc --noEmit` **puis** `npm test` avant tout deploiement.
 
 ## Architecture

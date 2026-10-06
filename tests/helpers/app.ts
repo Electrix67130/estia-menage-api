@@ -19,10 +19,22 @@ export async function createTestApp(): Promise<FastifyInstance> {
   app.inject = ((opts: InjectOptions) =>
     inject({
       ...opts,
+      // Le limiteur de debit global (100 req/min par IP) compte chaque requete
+      // injectee depuis 127.0.0.1 : un fichier un peu long tombait en 429 sans
+      // rapport avec ce qu'il verifie. Chaque requete part donc d'une adresse
+      // distincte — le limiteur n'est pas ce que ces tests prouvent.
+      remoteAddress: opts.remoteAddress ?? nextRemoteAddress(),
       headers: { 'x-api-key': process.env.API_KEY, ...(opts.headers ?? {}) },
     })) as typeof app.inject;
 
   return app;
+}
+
+let requestCounter = 0;
+function nextRemoteAddress(): string {
+  requestCounter += 1;
+  const n = requestCounter;
+  return `10.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`;
 }
 
 /** En-tete d'authentification pour un jeton d'acces. */
