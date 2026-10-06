@@ -180,6 +180,11 @@ export const listMenagesSchema = z.object({
    *  l'historique presta : ne voir que les prestations qu'il a réellement faites,
    *  pas toutes celles des logements dont il est membre. */
   assigned: z.literal('me').optional(),
+  /** Disponibilité des prestataires sur une prestation (votes présent/absent) :
+   *  `available` = au moins un « présent » ; `unavailable` = aucun « présent »
+   *  mais au moins un « absent » ; `no_response` = aucune réponse. Vue admin
+   *  « qui est dispo » sur les prestations sans prestataire. */
+  availability: z.enum(['available', 'unavailable', 'no_response']).optional(),
   from: z.string().optional(),
   to: z.string().optional(),
   /** Avec `closed=true` : inclut AUSSI les prestations **non clôturées** dont la
@@ -272,6 +277,12 @@ export type MenageRow = {
   logement_key_safe_code?: string | null;
   /** True s'il existe au moins une demande de report `pending` sur ce ménage. */
   has_pending_reschedule?: boolean;
+  /** Votes des prestataires (table `menage_response`), calculés par findActive.
+   *  Permettent le badge « n dispos / personne de dispo / aucune réponse ». */
+  present_count?: number;
+  absent_count?: number;
+  /** Nombre de membres `prestataire` du logement (= qui peuvent répondre). */
+  member_prestataire_count?: number;
   /**
    * Calculé (cf. `computeNeedsAttention`) : le jour prévu est passé, personne
    * n'a pointé (`arrived_at` vide) et le ménage est toujours `a_venir`.

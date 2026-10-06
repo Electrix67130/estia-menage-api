@@ -50,10 +50,10 @@ Réponses paginées : `{ data: [...], meta: { total, page, limit, totalPages } }
 |---|---|---|
 | GET | `/users` | Liste des users de l'org (admin) ou co-membres de logements |
 | GET | `/users/search?q=...` | Recherche par nom/email |
-| GET | `/users/:id` | Profil |
+| GET | `/users/:id` | Profil — soi-même ou un **co-membre d'organisation** uniquement (sinon 404 : la fiche d'un compte d'une autre org n'est pas lisible) |
 | PATCH | `/users/:id` | Édite son propre profil (ou admin pour role/is_active). `company_name` = admin-only (propagé org-wide + sync `organization.name`) ; `provider_company`/`provider_siret`/`provider_vat_number`/`provider_address` = entreprise perso du prestataire, éditables par lui-même, non propagées |
 | GET | `/company/lookup?siret=` | Résout un SIRET (14 chiffres) via l'annuaire public et renvoie `{ siret, siren, name, address, vat_number }` (TVA FR calculée). Authentifié. |
-| DELETE | `/users/:id` | Admin only |
+| DELETE | `/users/:id` | Admin only, et seulement un **membre de son organisation** (sinon 404) |
 
 ---
 
@@ -80,7 +80,7 @@ Réponses paginées : `{ data: [...], meta: { total, page, limit, totalPages } }
 | GET | `/invitations/by-token?token=` | Vérifie un token |
 | GET | `/invitations` | Liste (org-scoped). Réconcilie au passage : marque `accepted` les invitations `pending`/`expired` dont l'email est déjà membre de l'org. |
 | POST | `/invitations/accept` | Accepte invitation (lors de register) |
-| DELETE | `/invitations/:id` | Annule une invitation |
+| DELETE | `/invitations/:id` | Annule une invitation — **admin de l'organisation émettrice** uniquement (sinon 404) |
 
 ---
 
@@ -400,9 +400,9 @@ Chaque ménage sérialisé (liste **et** détail) inclut un booléen calculé **
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/menages?status=&type=&prestataire_user_id=&logement_id=&validated=&unassigned=&manager=me&assigned=me&from=&to=` | Liste filtrable. `type` = `menage`\|`check_in`\|`check_out` (défaut : tous types). Chaque ménage inclut un booléen `has_pending_reschedule` (true s'il existe au moins une `menage_reschedule_request` `status='pending'`) — sert à afficher un badge "demande en attente" sur les cards admin. |
+| GET | `/menages?status=&type=&prestataire_user_id=&logement_id=&validated=&unassigned=&availability=&manager=me&assigned=me&from=&to=` | Liste filtrable. `type` = `menage`\|`check_in`\|`check_out` (défaut : tous types). Chaque ménage inclut un booléen `has_pending_reschedule` (true s'il existe au moins une `menage_reschedule_request` `status='pending'`) — sert à afficher un badge "demande en attente" sur les cards admin. **Disponibilité** : chaque ménage porte `present_count` / `absent_count` (votes `menage_response`) et `member_prestataire_count` (membres `prestataire` du logement, = qui peut répondre) → badge « n dispos » / « Personne de dispo » / « Aucune réponse » sur les prestations sans prestataire. Filtre `availability` = `available` (≥ 1 présent) \| `unavailable` (0 présent, ≥ 1 absent) \| `no_response` (aucune réponse). |
 | GET | `/menages/:id` | Détail (inclut aussi `has_pending_reschedule`). |
-| GET | `/menages/:id/eligible-prestataires` | **Tous** les prestataires de l'org, avec un flag `is_member` (membre prestataire du logement). Les non-membres peuvent être affectés **ponctuellement** (remplacement) — ils ne reçoivent que ce ménage |
+| GET | `/menages/:id/eligible-prestataires` | **Tous** les prestataires de l'org, avec un flag `is_member` (membre prestataire du logement) et leur vote sur **ce** ménage : `response_status` (`present`\|`absent`\|`null` = pas répondu) + `responded_at`. Le sélecteur d'affectation groupe Disponibles / Sans réponse / Indisponibles. Les non-membres peuvent être affectés **ponctuellement** (remplacement) — ils ne reçoivent que ce ménage |
 | POST | `/menages` | Création (admin) — **génère auto la checklist**. Accepte `prestation_type` (`menage` par défaut) pour créer un check-in/check-out manuellement. |
 | PATCH | `/menages/:id` | Mise à jour (manager/admin via can_edit) — accepte `prestataire_user_id` pour affecter/désaffecter. **Changement de `status` = admin uniquement** (correction d'un statut erroné) : repasser en `a_venir` efface `arrived_at`+`departed_at`, repasser en `en_cours` efface `departed_at` (sauf valeurs explicitement fournies). Si on modifie `date_prevue` sur un ménage rattaché à un calendrier externe, `date_locked` est posé à `true` automatiquement (sauf valeur explicite). |
 | DELETE | `/menages/:id` | Suppression (admin). **Presta manuelle** → hard delete (`204`). **Presta auto** (sync iCal, `external_source` non null) → « retrait » soft : `status=annule` + `sync_ignored=true` (`200 { soft:true }`) → la sync ne la recrée/ré-active plus ; GC hard delete auto une fois passée + hors feed. |
@@ -769,6 +769,7 @@ Workflow inspiré de SportEasy : pour chaque ménage à venir sur un logement o�
 |---|---|---|
 | GET | `/menages/:id/responses` | Liste des réponses (admin ou tout membre du logement parent) |
 | POST | `/menages/:id/responses` | Upsert une réponse — presta pour lui-même, ou admin pour un autre presta via `user_id` |
+| POST | `/menages/:id/relance` | **Admin.** Renvoie une push « indique ta disponibilité » (`type: relance`) aux prestataires membres du logement qui n'ont **pas encore répondu**. Bouton « Relancer » de la vue admin sur une prestation sans réponse. `400` si la prestation est déjà affectée ou clôturée. Réponse `{ sent: n }` (n = destinataires). |
 | GET | `/prestataires/me/menages?from=&to=&mode=` | Mes ménages avec ma réponse. `mode=upcoming` (défaut) : à venir (statuts non-`annule`/`valide`, défaut today→+90j). `mode=history` : déjà faits (`termine`/`valide`, défaut -180j→today). |
 
 `POST /menages/:id/responses` body :

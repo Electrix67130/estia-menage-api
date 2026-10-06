@@ -77,6 +77,7 @@ class MenageService extends BaseService<MenageRow> {
       from,
       to,
       stale_before,
+      availability,
     } = options;
 
     // Filters communs aux deux requêtes (count + data) — pas de joins ici pour que
@@ -106,6 +107,22 @@ class MenageService extends BaseService<MenageRow> {
         qb.whereIn('menage.status', ['valide', 'annule']);
       }
       if (closed === false) qb.whereNotIn('menage.status', ['valide', 'annule']);
+      if (availability) {
+        const hasResponse = (status?: 'present' | 'absent') =>
+          function (this: Knex.QueryBuilder) {
+            this.select('*')
+              .from('menage_response')
+              .whereRaw('menage_response.menage_id = menage.id')
+              .modify((b) => {
+                if (status) b.where('menage_response.status', status);
+              });
+          };
+        if (availability === 'available') qb.whereExists(hasResponse('present'));
+        if (availability === 'unavailable') {
+          qb.whereNotExists(hasResponse('present')).whereExists(hasResponse('absent'));
+        }
+        if (availability === 'no_response') qb.whereNotExists(hasResponse());
+      }
       if (from) qb.where('menage.date_prevue', '>=', from);
       if (to) qb.where('menage.date_prevue', '<=', to);
       if (restrictToMember && managerUserId) {
@@ -178,6 +195,17 @@ class MenageService extends BaseService<MenageRow> {
           'logement.color as logement_color',
           this.db.raw(
             "EXISTS (SELECT 1 FROM menage_reschedule_request mrr WHERE mrr.menage_id = menage.id AND mrr.status = 'pending') as has_pending_reschedule",
+          ),
+          // Votes présent/absent : l'admin voit d'un coup d'œil où quelqu'un est
+          // dispo et où personne ne l'est, sans ouvrir chaque fiche.
+          this.db.raw(
+            "(SELECT COUNT(*)::int FROM menage_response mr WHERE mr.menage_id = menage.id AND mr.status = 'present') as present_count",
+          ),
+          this.db.raw(
+            "(SELECT COUNT(*)::int FROM menage_response mr WHERE mr.menage_id = menage.id AND mr.status = 'absent') as absent_count",
+          ),
+          this.db.raw(
+            "(SELECT COUNT(*)::int FROM logement_member lm WHERE lm.logement_id = menage.logement_id AND lm.role = 'prestataire') as member_prestataire_count",
           ),
         )
         .orderBy(`menage.${orderBy}`, order)

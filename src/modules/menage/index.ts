@@ -164,6 +164,16 @@ export default fp(
               `EXISTS (SELECT 1 FROM logement_member lm WHERE lm.logement_id = ? AND lm.user_id = "user".id AND lm.role = 'prestataire') as is_member`,
               [menage.logement_id],
             ),
+            // Vote présent/absent du presta sur CE ménage (null = pas répondu) :
+            // le sélecteur d'affectation remonte les disponibles en tête.
+            fastify.db.raw(
+              `(SELECT mr.status FROM menage_response mr WHERE mr.menage_id = ? AND mr.user_id = "user".id) as response_status`,
+              [menage.id],
+            ),
+            fastify.db.raw(
+              `(SELECT mr.responded_at FROM menage_response mr WHERE mr.menage_id = ? AND mr.user_id = "user".id) as responded_at`,
+              [menage.id],
+            ),
           )
           .orderBy('user.first_name', 'asc');
         return { data: signUrlsInList(data, ['avatar_url']) };

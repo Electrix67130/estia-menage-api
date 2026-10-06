@@ -481,12 +481,21 @@ export async function notifyMenageReminder(
 }
 
 /**
- * Relance (la veille) les prestataires membres du logement qui ne se sont PAS
- * encore positionnés (aucune réponse présent/absent) sur un ménage non assigné.
+ * Relance les prestataires membres du logement qui ne se sont PAS encore
+ * positionnés (aucune réponse présent/absent) sur un ménage non assigné.
+ *
+ * Deux déclencheurs : automatique la veille (reminder-worker) ou **manuel** par
+ * l'admin depuis la liste (« Relancer » sur une prestation sans réponse). Le
+ * libellé s'adapte : « demain » n'a de sens que pour la relance de la veille.
+ * Renvoie le nombre de destinataires (0 = tout le monde a déjà répondu).
  */
-export async function notifyMenageRelance(db: Knex, menageId: string): Promise<void> {
+export async function notifyMenageRelance(
+  db: Knex,
+  menageId: string,
+  opts: { manual?: boolean } = {},
+): Promise<number> {
   const label = await menageLabel(db, menageId);
-  if (!label) return;
+  if (!label) return 0;
   const members = (await db('logement_member')
     .where({ logement_id: label.logementId, role: 'prestataire' })
     .select('user_id')) as { user_id: string }[];
@@ -495,12 +504,13 @@ export async function notifyMenageRelance(db: Knex, menageId: string): Promise<v
     .select('user_id')) as { user_id: string }[];
   const respondedSet = new Set(responded.map((r) => r.user_id));
   const recipients = members.map((m) => m.user_id).filter((id) => !respondedSet.has(id));
-  if (recipients.length === 0) return;
+  if (recipients.length === 0) return 0;
   await sendPushToUsers(db, recipients, {
-    title: 'Ménage à pourvoir demain',
+    title: opts.manual ? 'Ménage à pourvoir' : 'Ménage à pourvoir demain',
     body: `${label.dateLabel}${label.lieu} · indique ta disponibilité`,
     data: { menage_id: menageId, type: 'relance' },
   });
+  return recipients.length;
 }
 
 /**

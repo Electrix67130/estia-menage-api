@@ -3,7 +3,7 @@ import { z } from 'zod';
 import MenageResponseService from './menage-response.service';
 import { upsertMenageResponseSchema, listMyMenagesSchema } from './menage-response.schema';
 import { getActiveMembership } from '@/lib/active-membership';
-import { notifyMenageResponse } from '@/lib/push';
+import { notifyMenageResponse, notifyMenageRelance } from '@/lib/push';
 
 const menageIdParam = z.object({ id: z.string().uuid() });
 
@@ -120,6 +120,44 @@ export default fp(
           );
         }
         return row;
+      },
+    );
+
+    // POST /menages/:id/relance — admin only. Renvoie une push « indique ta
+    // disponibilité » aux prestataires membres du logement qui n'ont PAS encore
+    // répondu. Bouton « Relancer » de la vue admin sur une prestation sans réponse.
+    // Refusé si la prestation est déjà affectée (plus rien à pourvoir).
+    fastify.post(
+      '/menages/:id/relance',
+      { preHandler: [fastify.authenticate], config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+      async (request, reply) => {
+        const { id } = menageIdParam.parse(request.params);
+        const membership = await getActiveMembership(fastify.db, request.user.sub);
+        if (!membership || membership.role !== 'admin') {
+          return reply
+            .code(403)
+            .send({ statusCode: 403, error: 'Forbidden', message: 'Admin only' });
+        }
+        const menage = await fastify.db('menage')
+          .where({ id, organization_id: membership.organization_id })
+          .first();
+        if (!menage) return reply.notFound('Menage not found');
+        if (menage.prestataire_user_id) {
+          return reply.code(400).send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Prestation déjà affectée',
+          });
+        }
+        if (['valide', 'annule'].includes(menage.status)) {
+          return reply.code(400).send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Prestation clôturée',
+          });
+        }
+        const sent = await notifyMenageRelance(fastify.db, id, { manual: true });
+        return { sent };
       },
     );
 
