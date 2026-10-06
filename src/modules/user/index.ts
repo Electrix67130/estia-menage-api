@@ -55,9 +55,27 @@ export default fp(
       return service.search({ query: q, organizationId: orgId, ...pagination });
     });
 
-    // GET /users/:id
+    /**
+     * Un utilisateur n'est « visible » que par lui-même ou par les membres d'une
+     * organisation qu'il partage avec l'appelant. Sans ce contrôle, un admin
+     * d'une autre org lisait la fiche (e-mail, téléphone) et pouvait supprimer
+     * le compte (trou détecté par les tests d'intégration).
+     */
+    async function partageUneOrganisation(callerId: string, targetId: string): Promise<boolean> {
+      if (callerId === targetId) return true;
+      const commun = await fastify
+        .db('organization_member as mine')
+        .join('organization_member as theirs', 'mine.organization_id', 'theirs.organization_id')
+        .where('mine.user_id', callerId)
+        .where('theirs.user_id', targetId)
+        .first('mine.organization_id');
+      return !!commun;
+    }
+
+    // GET /users/:id — soi-même ou un co-membre d'organisation
     fastify.get('/users/:id', { preHandler: [fastify.authenticate] }, async (request, reply) => {
       const { id } = uuidSchema.parse(request.params);
+      if (!(await partageUneOrganisation(request.user.sub, id))) return reply.notFound('User not found');
       const user = await service.findById(id);
       if (!user) return reply.notFound('User not found');
       const { password_hash: _, ...safeUser } = user;
@@ -116,13 +134,18 @@ export default fp(
       return safeUser;
     });
 
-    // DELETE /users/:id — admin only
+    // DELETE /users/:id — admin only, et seulement un membre de SON organisation
     fastify.delete('/users/:id', { preHandler: [fastify.authenticate] }, async (request, reply) => {
       const membership = await getActiveMembership(fastify.db, request.user.sub);
       if (membership?.role !== 'admin') {
         return reply.code(403).send({ statusCode: 403, error: 'Forbidden', message: 'Admin only' });
       }
       const { id } = uuidSchema.parse(request.params);
+      const cible = await fastify
+        .db('organization_member')
+        .where({ organization_id: membership.organization_id, user_id: id })
+        .first();
+      if (!cible) return reply.notFound('User not found');
       const deleted = await service.delete(id);
       if (!deleted) return reply.notFound('User not found');
       return reply.code(204).send();

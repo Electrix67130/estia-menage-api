@@ -92,9 +92,23 @@ export default fp(
       return { message: 'Invitation accepted', invitation };
     });
 
-    // DELETE /invitations/:id — cancel an invitation
+    // DELETE /invitations/:id — cancel an invitation.
+    // Réservé à un admin de l'organisation qui l'a émise : sans ce contrôle,
+    // n'importe quel compte authentifié pouvait annuler l'invitation d'une
+    // autre org (trou détecté par les tests d'intégration). 404 plutôt que 403
+    // pour ne pas révéler l'existence de l'invitation.
     fastify.delete('/invitations/:id', { preHandler: [fastify.authenticate] }, async (request, reply) => {
       const { id } = uuidParamSchema.parse(request.params);
+      const membership = await getActiveMembership(fastify.db, request.user.sub);
+      const invitation = await service.findById(id);
+      if (
+        !invitation ||
+        !membership ||
+        membership.role !== 'admin' ||
+        invitation.organization_id !== membership.organization_id
+      ) {
+        return reply.notFound('Invitation not found');
+      }
       const deleted = await service.delete(id);
       if (!deleted) return reply.notFound('Invitation not found');
       return reply.code(204).send();
