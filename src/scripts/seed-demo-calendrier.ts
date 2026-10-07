@@ -17,6 +17,7 @@
  * photos, équipements — n'est pas touché.
  */
 import knex from 'knex';
+import bcrypt from 'bcrypt';
 import knexConfig from '@/config/knexfile';
 import { generateChecklistForMenage } from '@/modules/menage-check/menage-check.service';
 import type { LogementRow } from '@/modules/logement/logement.schema';
@@ -66,6 +67,37 @@ async function main(): Promise<void> {
       .orderBy('created_at', 'asc')) as LogementRow[];
     if (logements.length < 2) throw new Error('Logements de démonstration introuvables');
 
+    // Deux prestataires de plus (même mot de passe que les comptes démo) : sans
+    // eux, l'admin n'a personne à choisir et la vue « qui est dispo ? » est vide.
+    const hash = await bcrypt.hash('DemoEstia2026!', 10);
+    const collegue = async (email: string, prenom: string, nom: string) => {
+      let u = await db('user').where({ email }).first();
+      if (!u) {
+        [u] = await db('user')
+          .insert({
+            email,
+            password_hash: hash,
+            first_name: prenom,
+            last_name: nom,
+            phone: '0600000000',
+            role: 'prestataire',
+            organization_id: org.id,
+            active_organization_id: org.id,
+            is_active: true,
+          })
+          .returning('*');
+      }
+      const membre = await db('organization_member').where({ organization_id: org.id, user_id: u.id }).first();
+      if (!membre) await db('organization_member').insert({ organization_id: org.id, user_id: u.id, role: 'prestataire' });
+      for (const l of logements) {
+        const lm = await db('logement_member').where({ logement_id: l.id, user_id: u.id }).first();
+        if (!lm) await db('logement_member').insert({ logement_id: l.id, user_id: u.id, role: 'prestataire' });
+      }
+      return u as { id: string };
+    };
+    const sofia = await collegue('demo.presta2@estia-clean-connect.fr', 'Sofia', 'Benali');
+    const karim = await collegue('demo.presta3@estia-clean-connect.fr', 'Karim', 'Lefèvre');
+
     // Repartir de zéro sur les seules lignes générées ici.
     const anciens = (await db('menage')
       .where({ organization_id: org.id, external_source: SOURCE })
@@ -73,6 +105,7 @@ async function main(): Promise<void> {
     if (anciens.length > 0) {
       const ids = anciens.map((m) => m.id);
       await db('menage_prestataire').whereIn('menage_id', ids).del();
+      await db('menage_response').whereIn('menage_id', ids).del();
       await db('menage').whereIn('id', ids).del();
       console.log(`${ids.length} prestation(s) générée(s) précédemment supprimée(s).`);
     }
@@ -83,11 +116,23 @@ async function main(): Promise<void> {
       const arrivee = jour(sejour.arrivee);
       const depart = jour(sejour.arrivee + sejour.nuits);
       const uid = `${SOURCE}-${index}`;
-      // Deux séjours sur trois sont confiés à la prestataire de démonstration ;
-      // les autres restent à pourvoir, ce qui rend la vue « non assigné » utile.
-      const affecte = index % 3 !== 2;
       // Un séjour au départ passé est déjà fait ; les autres sont à venir.
       const passe = sejour.arrivee + sejour.nuits < 0;
+      // Passé : tout a été fait par la prestataire de démonstration. Le plus
+      // ancien est validé (historique), les suivants sont **terminés mais pas
+      // encore validés** → l'admin a quelque chose dans « À valider ».
+      const aValider = passe && index > 0;
+      // À venir : deux séjours sur trois sont confiés à la prestataire, les
+      // autres restent à pourvoir avec des votes différents (un où deux
+      // collègues sont dispo, un où tout le monde a dit absent, un sans réponse)
+      // pour que la vue « qui est dispo ? » montre ses trois états.
+      const affecte = passe || (index % 3 !== 2 && index !== 7);
+      const votes: Array<{ user: { id: string }; status: 'present' | 'absent' }> =
+        index === 5
+          ? [{ user: presta, status: 'present' }, { user: sofia, status: 'present' }, { user: karim, status: 'absent' }]
+          : index === 8
+            ? [{ user: presta, status: 'absent' }, { user: karim, status: 'absent' }]
+            : [];
 
       const prestations = [
         { type: 'check_in' as const, date: arrivee, nuits: null as number | null },
@@ -104,7 +149,7 @@ async function main(): Promise<void> {
             created_by: admin.id,
             prestataire_user_id: affecte ? presta.id : null,
             prestation_type: p.type,
-            status: passe ? 'valide' : 'a_venir',
+            status: aValider ? 'termine' : passe ? 'valide' : 'a_venir',
             date_prevue: p.date,
             stay_nights: p.nuits,
             next_checkin_at: estMenage ? depart : null,
@@ -121,9 +166,13 @@ async function main(): Promise<void> {
                   arrived_at: new Date(`${p.date}T08:05:00Z`),
                   departed_at: new Date(`${p.date}T10:10:00Z`),
                   date_realisation: p.date,
-                  validated_at: new Date(`${p.date}T18:00:00Z`),
-                  validated_by: admin.id,
-                  validated_price: estMenage ? 90 : null,
+                  ...(aValider
+                    ? { traveler_rating: 4 }
+                    : {
+                        validated_at: new Date(`${p.date}T18:00:00Z`),
+                        validated_by: admin.id,
+                        validated_price: estMenage ? 90 : null,
+                      }),
                 }
               : {}),
           })
@@ -131,6 +180,9 @@ async function main(): Promise<void> {
 
         if (affecte) {
           await db('menage_prestataire').insert({ menage_id: menage.id, user_id: presta.id });
+        }
+        for (const v of votes) {
+          await db('menage_response').insert({ menage_id: menage.id, user_id: v.user.id, status: v.status });
         }
         // Seuls les ménages portent une checklist : un check-in n'en a pas.
         if (estMenage) {
