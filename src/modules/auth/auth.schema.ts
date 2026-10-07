@@ -44,6 +44,11 @@ export const updatePasswordSchema = z.object({
   new_password: passwordSchema,
 });
 
+/** Suppression de son propre compte : le mot de passe courant confirme l'intention. */
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1),
+});
+
 export const platformEnum = z.enum(['mobile', 'web']);
 export type Platform = z.infer<typeof platformEnum>;
 

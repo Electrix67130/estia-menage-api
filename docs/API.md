@@ -17,6 +17,7 @@ Réponses paginées : `{ data: [...], meta: { total, page, limit, totalPages } }
 | POST | `/auth/refresh` | Renouvelle l'access_token |
 | POST | `/auth/logout` | Invalide le refresh token (par device si on l'envoie dans le body) |
 | GET  | `/auth/me` | Profil + organisation active |
+| DELETE | `/auth/account` | **Supprimer son propre compte** (App Store 5.1.1) — body `{ password }`. Le compte est **anonymisé** (e-mail `deleted-<id>@deleted.invalid`, nom « Compte supprimé », téléphone/avatar/société effacés, mot de passe invalidé, `is_active=false`) ; appartenances, membres de logements, appareils, sessions, votes, disponibilités et invitations effacés ; **prestations à venir désaffectées**. Historique (prestations passées, commentaires, photos) conservé. `401` mauvais mot de passe, `409` dernier admin d'une organisation qui a encore des membres (transmettre le rôle d'abord). `204`. |
 
 ### Sessions multi-plateforme
 
@@ -1070,7 +1071,7 @@ l'**organisation** : les admins voient les signalements de leurs membres et y r�
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| POST | `/feedbacks` | Déposer un bug ou une suggestion (tout utilisateur connecté) |
+| POST | `/feedbacks` | Déposer un bug, une suggestion ou un **signalement de contenu** (`type: report`, avec `target_type` = `comment`\|`photo` et `target_id`) — tout utilisateur connecté. Un `report` déclenche une **push « Contenu signalé »** aux admins de l'org (hors auteur) ; les admins le retrouvent via `GET /feedbacks?type=report` pour supprimer le contenu ou écarter son auteur (App Store 1.2). |
 | GET | `/feedbacks/mine` | Ses propres signalements + les réponses reçues |
 | GET | `/feedbacks/mine/:id` | Détail d'un de ses signalements (404 si ce n'est pas le sien) |
 | GET | `/feedbacks?status=&type=&q=` | Signalements de l'org, filtrables (**admin**) → `{ data, meta, counts }` |
@@ -1087,6 +1088,10 @@ l'**organisation** : les admins voient les signalements de leurs membres et y r�
   "screen": "/menage/[id]",
   "locale": "fr"
 }
+```
+Signalement de contenu :
+```json
+{ "type": "report", "subject": "Commentaire inapproprié", "message": "…", "target_type": "comment", "target_id": "<uuid>" }
 ```
 - `type` ∈ `bug` | `suggestion` · `subject` 3-150 · `message` 10-5000.
 - `platform` / `app_version` / `screen` : contexte technique, facultatif mais précieux — sans lui un

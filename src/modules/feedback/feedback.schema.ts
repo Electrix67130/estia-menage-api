@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
 /** Nature du signalement. */
-export const FEEDBACK_TYPES = ['bug', 'suggestion'] as const;
+export const FEEDBACK_TYPES = ['bug', 'suggestion', 'report'] as const;
+/** Ce qu'un `report` peut viser. */
+export const FEEDBACK_TARGET_TYPES = ['comment', 'photo'] as const;
 /** Cycle de vie côté admin. */
 export const FEEDBACK_STATUSES = ['new', 'in_progress', 'resolved', 'declined'] as const;
 
@@ -15,6 +17,10 @@ export const createFeedbackSchema = z.object({
   screen: z.string().max(200).optional(),
   /** Langue de rédaction — c'est dans celle-là qu'il faut répondre. */
   locale: z.enum(['fr', 'en', 'de', 'es', 'it', 'pt', 'tr', 'pl']).optional(),
+  /** `report` uniquement : le contenu signalé (commentaire ou photo). Les
+   *  admins de l'org le retrouvent pour le supprimer ou écarter son auteur. */
+  target_type: z.enum(FEEDBACK_TARGET_TYPES).optional(),
+  target_id: z.string().uuid().optional(),
 });
 
 /**

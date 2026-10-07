@@ -7,7 +7,7 @@ import {
   respondFeedbackSchema,
 } from './feedback.schema';
 import { getActiveMembership } from '@/lib/active-membership';
-import { notifyFeedbackReply } from '@/lib/push';
+import { notifyFeedbackReply, sendPushToUsers } from '@/lib/push';
 
 const uuidParamSchema = z.object({ id: z.string().uuid() });
 const minePaginationSchema = z.object({
@@ -46,8 +46,27 @@ export default fp(
           app_version: data.app_version ?? null,
           screen: data.screen ?? null,
           locale: data.locale ?? 'fr',
+          target_type: data.target_type ?? null,
+          target_id: data.target_id ?? null,
         })
         .returning('*');
+
+      // Un contenu signalé doit être vu vite : push aux admins de l'org (hors
+      // auteur du signalement), là où bugs et suggestions attendent le dashboard.
+      if (data.type === 'report' && membership) {
+        const admins = (await fastify
+          .db('organization_member')
+          .where({ organization_id: membership.organization_id, role: 'admin' })
+          .whereNot('user_id', request.user.sub)
+          .pluck('user_id')) as string[];
+        if (admins.length) {
+          await sendPushToUsers(fastify.db, admins, {
+            title: 'Contenu signalé',
+            body: data.subject,
+            data: { feedback_id: feedback.id, type: 'content_report' },
+          });
+        }
+      }
 
       return reply.code(201).send(feedback);
     });

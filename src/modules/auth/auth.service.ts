@@ -295,6 +295,107 @@ class AuthService {
 
     return { access_token: accessToken, refresh_token: refreshToken };
   }
+
+  /**
+   * Suppression du compte par son titulaire (exigence App Store 5.1.1(v) : une
+   * app qui permet de créer un compte doit permettre de le supprimer depuis
+   * l'app).
+   *
+   * Le compte est **anonymisé** plutôt que supprimé physiquement : les
+   * prestations, commentaires et photos qu'il a produits sont l'historique de
+   * l'organisation (et sa base de facturation) et doivent survivre. Tout ce
+   * qui identifie la personne disparaît : e-mail, nom, téléphone, avatar,
+   * société, mot de passe ; ses appartenances, sessions, appareils, votes et
+   * disponibilités sont effacés, et ses prestations **à venir** sont
+   * désaffectées pour qu'aucun travail ne reste attribué à un compte fantôme.
+   *
+   * Refusé (409) si la personne est le dernier admin d'une organisation qui a
+   * encore d'autres membres : il faut d'abord transmettre le rôle, sinon l'org
+   * devient ingérable.
+   */
+  async deleteAccount(userId: string, password: string): Promise<void> {
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      throw Object.assign(new Error('User not found'), { statusCode: 404 });
+    }
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      throw Object.assign(new Error('Password is incorrect'), { statusCode: 401 });
+    }
+
+    const db = this.fastify.db;
+    const adminOf = (await db('organization_member')
+      .where({ user_id: userId, role: 'admin' })
+      .select('organization_id')) as { organization_id: string }[];
+    for (const { organization_id } of adminOf) {
+      const [{ admins }] = (await db('organization_member')
+        .where({ organization_id, role: 'admin' })
+        .count('* as admins')) as { admins: string }[];
+      const [{ members }] = (await db('organization_member')
+        .where({ organization_id })
+        .count('* as members')) as { members: string }[];
+      if (Number(admins) === 1 && Number(members) > 1) {
+        throw Object.assign(
+          new Error(
+            'Vous êtes le seul administrateur d’une organisation qui a encore des membres : nommez un autre administrateur avant de supprimer votre compte.',
+          ),
+          { statusCode: 409, code: 'LAST_ADMIN' },
+        );
+      }
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    await db.transaction(async (trx) => {
+      // Prestations à venir : personne ne doit rester affecté à un compte supprimé.
+      const upcomingIds = (await trx('menage')
+        .where('date_prevue', '>=', today)
+        .whereNotIn('status', ['valide', 'annule'])
+        .where((b) =>
+          b.where('prestataire_user_id', userId).orWhereExists(function () {
+            this.select('*')
+              .from('menage_prestataire')
+              .whereRaw('menage_prestataire.menage_id = menage.id')
+              .where('menage_prestataire.user_id', userId);
+          }),
+        )
+        .pluck('id')) as string[];
+      if (upcomingIds.length) {
+        await trx('menage_prestataire').whereIn('menage_id', upcomingIds).where({ user_id: userId }).del();
+        await trx('menage')
+          .whereIn('id', upcomingIds)
+          .where({ prestataire_user_id: userId })
+          .update({ prestataire_user_id: null });
+      }
+
+      await trx('menage_prestataire').where({ user_id: userId }).whereIn('menage_id', upcomingIds).del();
+      await trx('menage_response').where({ user_id: userId }).del();
+      await trx('prestataire_weekly_availability').where({ user_id: userId }).del();
+      await trx('menage_view').where({ user_id: userId }).del();
+      await trx('device_token').where({ user_id: userId }).del();
+      await trx('refresh_token').where({ user_id: userId }).del();
+      await trx('logement_member').where({ user_id: userId }).del();
+      await trx('organization_member').where({ user_id: userId }).del();
+      await trx('invitation').where({ email: user.email }).del();
+
+      await trx('user')
+        .where({ id: userId })
+        .update({
+          email: `deleted-${userId}@deleted.invalid`,
+          first_name: 'Compte',
+          last_name: 'supprimé',
+          phone: null,
+          avatar_url: null,
+          avatar_thumbnail_url: null,
+          company_name: null,
+          password_hash: await bcrypt.hash(randomUUID(), SALT_ROUNDS),
+          is_active: false,
+          // Sessions par plateforme : plus aucun jeton d'accès en cours ne correspond.
+          current_mobile_session_id: null,
+          current_web_session_id: null,
+        });
+    });
+    invalidateSessionCache(userId);
+  }
 }
 
 export default AuthService;

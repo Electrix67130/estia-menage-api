@@ -251,7 +251,7 @@ export function renderPrivacyPage(): string {
       <p>Vous disposez d'un droit d'acces, de rectification, d'effacement, de limitation et de portabilite de vos donnees, ainsi que du droit de retirer votre consentement. Pour exercer ces droits, contactez-nous a <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Vous pouvez egalement introduire une reclamation aupres de la CNIL.</p>
 
       <h2>7. Suppression de votre compte</h2>
-      <p>Vous pouvez demander la suppression de votre compte et des donnees associees a tout moment en ecrivant a <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
+      <p>Vous pouvez supprimer votre compte vous-meme, a tout moment, depuis l'application : <strong>Profil &rsaquo; Securite &rsaquo; Supprimer mon compte</strong> (ou, sur le tableau de bord web, <strong>Reglages &rsaquo; Supprimer mon compte</strong>). La suppression est immediate : vos donnees d'identite (nom, e-mail, telephone, photo) sont effacees et vos acces coupes. Les prestations deja realisees restent dans l'historique de votre organisation, sans vous identifier. Vous pouvez aussi en faire la demande en ecrivant a <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
 
       <h2>8. Contact</h2>
       <p>${CONTROLLER} — <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p>

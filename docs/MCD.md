@@ -285,7 +285,9 @@ Signalements des utilisateurs : bugs et suggestions (migration 20260908210715). 
 | id | uuid PK | |
 | user_id | uuid FK user CASCADE notnull | auteur ; supprimer le compte efface ses signalements |
 | organization_id | uuid FK organization SET NULL | org au moment de l'envoi = qui traite |
-| type | varchar(20) notnull | `bug` ou `suggestion` |
+| type | varchar(20) notnull | `bug`, `suggestion` ou `report` (signalement de contenu) |
+| target_type | varchar(20) | `report` : `comment` ou `photo` (migration 20261007090000) |
+| target_id | uuid | id du contenu signalé ; INDEX `(target_type, target_id)` |
 | subject | varchar(150) notnull | |
 | message | text notnull | |
 | status | varchar(20) notnull | `new` / `in_progress` / `resolved` / `declined` (défaut `new`) |

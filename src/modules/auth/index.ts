@@ -2,7 +2,7 @@ import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import AuthService from './auth.service';
-import { registerSchema, loginSchema, refreshSchema, updatePasswordSchema, forgotPasswordSchema, resetPasswordSchema } from './auth.schema';
+import { registerSchema, loginSchema, refreshSchema, updatePasswordSchema, forgotPasswordSchema, resetPasswordSchema, deleteAccountSchema } from './auth.schema';
 import OrganizationMemberService from '../organization-member/organization-member.service';
 import { signFields } from '@/lib/sign-url';
 
@@ -57,6 +57,14 @@ export default fp(
       const { current_password, new_password } = updatePasswordSchema.parse(request.body);
       const result = await authService.updatePassword(request.user.sub, current_password, new_password);
       return reply.send(result);
+    });
+
+    // DELETE /auth/account — suppression de son propre compte (App Store 5.1.1).
+    // Body { password }. 401 mot de passe faux, 409 dernier admin d'une org peuplée.
+    fastify.delete('/auth/account', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+      const { password } = deleteAccountSchema.parse(request.body);
+      await authService.deleteAccount(request.user.sub, password);
+      return reply.code(204).send();
     });
 
     fastify.get('/auth/me', { preHandler: [fastify.authenticate] }, async (request, reply) => {
