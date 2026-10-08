@@ -10,7 +10,7 @@ import { signFields } from '@/lib/sign-url';
 
 /**
  * Si l'utilisateur n'a pas fourni de coordonnées explicites mais a fourni
- * une adresse, on tente de geocoder via BAN. Best-effort : un échec ne
+ * une adresse, on tente de geocoder (BAN, Suisse ou Luxembourg selon le code postal). Best-effort : un échec ne
  * bloque pas la création/modification.
  */
 async function maybeFillCoords<T extends { address?: string | null; postal_code?: string | null; city?: string | null; latitude?: number | null; longitude?: number | null }>(
@@ -194,7 +194,7 @@ export default fp(
           return reply.code(422).send({
             statusCode: 422,
             error: 'Unprocessable',
-            message: 'Adresse introuvable (BAN)',
+            message: 'Adresse introuvable',
           });
         }
         const updated = await service.update(id, {
