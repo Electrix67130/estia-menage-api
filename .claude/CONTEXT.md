@@ -22,7 +22,7 @@ Une conciergerie (org) gère des **logements** et des **prestataires** ; chaque 
 >
 > ⚠️ **OTA mobile — toujours `--environment production`.** Sans ce flag, `eas update` inline le `.env` **local** (`EXPO_PUBLIC_API_URL`/`_API_KEY` = localhost) dans le bundle prod → l'app pointe vers l'API locale et le login casse. Les vraies valeurs sont dans les variables d'env EAS (environment `production`).
 
-**Pays de distribution (décision 08/10/2026)** : **France, Belgique, Suisse, Luxembourg** uniquement (App Store, et Play Store à sa publication). Hors de ces pays rien n'est prêt : facturation aux règles françaises, pages légales en français, recherche d'adresse limitée à FR/CH/LU/BE. Ouvrir un pays = décision délibérée qui traite ces trois points.
+**Pays de distribution (décision 08/10/2026)** : **France, Belgique, Suisse, Luxembourg** uniquement (App Store : appliqué le 08/10/2026 ; Play Store : à faire à sa publication). Hors de ces pays rien n'est prêt : facturation aux règles françaises, pages légales en français, recherche d'adresse limitée à FR/CH/LU/BE. Ouvrir un pays = décision délibérée qui traite ces trois points.
 
 **Parité** : toute feature doit être déclinée dashboard **et** mobile quand elle concerne les deux (sauf facturation/gains = dashboard-only).
 
