@@ -27,7 +27,14 @@ export async function createTestApp(): Promise<FastifyInstance> {
       headers: { 'x-api-key': process.env.API_KEY, ...(opts.headers ?? {}) },
     })) as typeof app.inject;
 
+  appEnCours = app;
   return app;
+}
+
+/** L'application du fichier de test en cours : `laisserPartirLesPush` surveille sa base. */
+let appEnCours: FastifyInstance | null = null;
+export function applicationEnCours(): FastifyInstance | null {
+  return appEnCours;
 }
 
 let requestCounter = 0;
