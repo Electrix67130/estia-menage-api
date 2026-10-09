@@ -1,44 +1,49 @@
 import fp from 'fastify-plugin';
-import { z } from 'zod';
-import { NOTIFICATION_CATEGORIES } from '@/lib/push';
-
-const updateSchema = z.object({
-  key: z.enum(NOTIFICATION_CATEGORIES),
-  enabled: z.boolean(),
-});
+import NotificationPreferenceService from './notification-preference.service';
+import { logementLevelSchema, logementParamsSchema, updatePreferenceSchema } from './notification-preference.schema';
 
 export default fp(
   (fastify, _opts, done) => {
-    // GET /notification-preferences — état de chaque catégorie pour le user courant.
+    const service = new NotificationPreferenceService(fastify.db);
+
+    // GET /notification-preferences — catégories (à plat), interrupteur général, logements réglés.
     // Par défaut tout est activé ; seules les valeurs explicitement `false` coupent.
+    fastify.get('/notification-preferences', { preHandler: [fastify.authenticate] }, async (request) => {
+      return service.get(request.user.sub);
+    });
+
+    // PATCH /notification-preferences — `{ key, enabled }` (une catégorie) ou `{ push_enabled }` (tout).
+    fastify.patch('/notification-preferences', { preHandler: [fastify.authenticate] }, async (request) => {
+      const data = updatePreferenceSchema.parse(request.body);
+      await service.update(request.user.sub, data);
+      return data;
+    });
+
+    // GET /notification-preferences/logements/:logementId — réglage d'un logement
     fastify.get(
-      '/notification-preferences',
+      '/notification-preferences/logements/:logementId',
       { preHandler: [fastify.authenticate] },
-      async (request) => {
-        const row = (await fastify.db('user')
-          .where({ id: request.user.sub })
-          .select('notification_prefs')
-          .first()) as { notification_prefs: Record<string, boolean> | null } | undefined;
-        const prefs = row?.notification_prefs ?? {};
-        return Object.fromEntries(NOTIFICATION_CATEGORIES.map((c) => [c, prefs[c] !== false]));
+      async (request, reply) => {
+        const { logementId } = logementParamsSchema.parse(request.params);
+        if (!(await service.canAccessLogement(request.user.sub, logementId))) {
+          return reply.notFound('Logement not found');
+        }
+        return { logement_id: logementId, level: await service.getLogementLevel(request.user.sub, logementId) };
       },
     );
 
-    // PATCH /notification-preferences — active/désactive une catégorie.
-    fastify.patch(
-      '/notification-preferences',
+    // PUT /notification-preferences/logements/:logementId — tout, l'important, ou rien
+    fastify.put(
+      '/notification-preferences/logements/:logementId',
       { preHandler: [fastify.authenticate] },
-      async (request) => {
-        const { key, enabled } = updateSchema.parse(request.body);
-        await fastify.db('user')
-          .where({ id: request.user.sub })
-          .update({
-            notification_prefs: fastify.db.raw(
-              `jsonb_set(coalesce(notification_prefs, '{}'::jsonb), ?, ?::jsonb, true)`,
-              [`{${key}}`, JSON.stringify(enabled)],
-            ),
-          });
-        return { key, enabled };
+      async (request, reply) => {
+        const { logementId } = logementParamsSchema.parse(request.params);
+        const { level } = logementLevelSchema.parse(request.body);
+        if (!(await service.canAccessLogement(request.user.sub, logementId))) {
+          return reply.notFound('Logement not found');
+        }
+        await service.setLogementLevel(request.user.sub, logementId, level);
+        return { logement_id: logementId, level };
       },
     );
 

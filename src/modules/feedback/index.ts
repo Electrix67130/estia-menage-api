@@ -1,13 +1,14 @@
 import fp from 'fastify-plugin';
 import { z } from 'zod';
 import FeedbackService from './feedback.service';
+import ReportService from '@/modules/report/report.service';
 import {
   createFeedbackSchema,
   listFeedbackSchema,
   respondFeedbackSchema,
 } from './feedback.schema';
 import { getActiveMembership } from '@/lib/active-membership';
-import { notifyFeedbackReply, sendPushToUsers } from '@/lib/push';
+import { notifyFeedbackReply } from '@/lib/push';
 
 const uuidParamSchema = z.object({ id: z.string().uuid() });
 const minePaginationSchema = z.object({
@@ -25,10 +26,33 @@ const minePaginationSchema = z.object({
 export default fp(
   (fastify, _opts, done) => {
     const service = new FeedbackService(fastify.db);
+    const reports = new ReportService(fastify.db);
 
     // POST /feedbacks — déposer un signalement
     fastify.post('/feedbacks', { preHandler: [fastify.authenticate] }, async (request, reply) => {
       const data = createFeedbackSchema.parse(request.body);
+
+      // Ancien chemin du signalement de contenu (07/10) : les apps pas encore à
+      // jour l'empruntent encore. Il rejoint désormais le module `report`.
+      if (data.type === 'report') {
+        if (!data.target_type || !data.target_id) {
+          return reply.code(400).send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Un signalement de contenu doit viser un message ou une photo',
+          });
+        }
+        const result = await reports.submit(
+          { target_type: data.target_type, target_id: data.target_id, reason: 'other', comment: data.message },
+          request.user.sub,
+          (err) => fastify.log.error({ err }, 'Report notify failed'),
+        );
+        if (result.kind === 'not_found') return reply.notFound('Cible introuvable');
+        if (result.kind === 'self') {
+          return reply.code(400).send({ statusCode: 400, error: 'Bad Request', message: 'On ne se signale pas soi-même' });
+        }
+        return reply.code(result.kind === 'created' ? 201 : 200).send(result.report);
+      }
       // L'organisation situe le signalement, sans le conditionner : quelqu'un
       // sans org active doit pouvoir signaler un bug — c'est même probablement
       // de cela qu'il veut parler.
@@ -50,23 +74,6 @@ export default fp(
           target_id: data.target_id ?? null,
         })
         .returning('*');
-
-      // Un contenu signalé doit être vu vite : push aux admins de l'org (hors
-      // auteur du signalement), là où bugs et suggestions attendent le dashboard.
-      if (data.type === 'report' && membership) {
-        const admins = (await fastify
-          .db('organization_member')
-          .where({ organization_id: membership.organization_id, role: 'admin' })
-          .whereNot('user_id', request.user.sub)
-          .pluck('user_id')) as string[];
-        if (admins.length) {
-          await sendPushToUsers(fastify.db, admins, {
-            title: 'Contenu signalé',
-            body: data.subject,
-            data: { feedback_id: feedback.id, type: 'content_report' },
-          });
-        }
-      }
 
       return reply.code(201).send(feedback);
     });

@@ -372,3 +372,34 @@ describe('disponibilités hebdomadaires', () => {
     expect(refus.statusCode).toBe(403);
   });
 });
+
+describe('modification d’un compte par un admin', () => {
+  it('un admin ne modifie pas un compte d’une autre organisation', async () => {
+    const { admin } = await createOrgWithAdmin(app, 'Conciergerie A');
+    const { organizationId: orgB } = await createOrgWithAdmin(app, 'Conciergerie B');
+    const victime = await createUser(app, { organizationId: orgB, role: 'prestataire' });
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/users/${victime.id}`,
+      headers: auth(admin.token),
+      payload: { is_active: false, role: 'admin' },
+    });
+    expect(res.statusCode).toBe(404);
+    const apres = await app.db('user').where({ id: victime.id }).first();
+    expect(apres).toMatchObject({ is_active: true, role: 'prestataire' });
+  });
+
+  it('il désactive bien un membre de sa propre organisation', async () => {
+    const { organizationId, admin } = await createOrgWithAdmin(app, 'Conciergerie A');
+    const membre = await createUser(app, { organizationId, role: 'prestataire' });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/users/${membre.id}`,
+      headers: auth(admin.token),
+      payload: { is_active: false },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((await app.db('user').where({ id: membre.id }).first()).is_active).toBe(false);
+  });
+});

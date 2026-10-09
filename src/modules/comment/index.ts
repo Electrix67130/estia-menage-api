@@ -1,7 +1,7 @@
 import fp from 'fastify-plugin';
 import { z } from 'zod';
 import CommentService from './comment.service';
-import { createCommentSchema, updateCommentSchema } from './comment.schema';
+import { createCommentSchema, reactionSchema, updateCommentSchema } from './comment.schema';
 import { requireMenageAccess, requirePermissionForMenage } from '@/lib/permissions';
 import { emitToMenage, getMenageRecipientIds } from '@/lib/realtime-hub';
 import { sendPushToUsers } from '@/lib/push';
@@ -53,7 +53,7 @@ export default fp(
     fastify.get('/comments', { preHandler: [fastify.authenticate] }, async (request) => {
       const { menage_id, section_id, ...pagination } = byMenageSchema.parse(request.query);
       await requireMenageAccess(fastify.db, request.user.sub, menage_id, 'view_comments');
-      return service.findByMenage(menage_id, { ...pagination, sectionId: section_id });
+      return service.findByMenage(menage_id, { ...pagination, sectionId: section_id, viewerId: request.user.sub });
     });
 
     // GET /comments/mentionable?menage_id=xxx — personnes qu'on peut mentionner (« @ »)
@@ -95,6 +95,19 @@ export default fp(
         }
       }
 
+      // Le message cité doit être de la même prestation : sinon on ferait
+      // apparaître chez soi un extrait de la discussion d'une autre.
+      if (data.reply_to_id) {
+        const target = await fastify.db('comment').where({ id: data.reply_to_id }).select('menage_id').first();
+        if (!target || target.menage_id !== data.menage_id) {
+          return reply.code(400).send({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'reply_to_id ne correspond pas au ménage',
+          });
+        }
+      }
+
       const { mentioned_user_ids = [], ...fields } = data;
       const comment = await service.create({ ...fields, author_id: request.user.sub });
       const mentioned =
@@ -126,6 +139,25 @@ export default fp(
       })().catch((err) => fastify.log.error({ err }, 'push comment failed'));
 
       return reply.code(201).send({ ...comment, mentions: await service.mentionsOf(comment.id) });
+    });
+
+    // POST /comments/:id/reactions — interrupteur : ajoute ou retire SA réaction.
+    // Quiconque peut lire la discussion peut y réagir, comme pour écrire.
+    fastify.post('/comments/:id/reactions', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+      const { id } = uuidSchema.parse(request.params);
+      const { emoji } = reactionSchema.parse(request.body);
+      const existing = await service.findById(id);
+      if (!existing) return reply.notFound('Comment not found');
+      await requireMenageAccess(fastify.db, request.user.sub, existing.menage_id, 'view_comments');
+
+      const reactions = await service.toggleReaction(id, request.user.sub, emoji);
+      emitToMenage(fastify.db, existing.menage_id, {
+        type: 'comment.updated',
+        menage_id: existing.menage_id,
+        resource_id: id,
+        actor_id: request.user.sub,
+      }).catch((err) => fastify.log.error({ err }, 'WS emit failed'));
+      return { comment_id: id, reactions };
     });
 
     fastify.patch('/comments/:id', { preHandler: [fastify.authenticate] }, async (request, reply) => {

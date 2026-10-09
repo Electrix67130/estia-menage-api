@@ -128,13 +128,13 @@ describe('suppression de son compte (App Store 5.1.1)', () => {
 });
 
 describe('signalement de contenu (App Store 1.2)', () => {
-  it('un membre signale un commentaire ; les admins de l’org le voient et reçoivent une push', async () => {
+  it('l’ancien chemin (POST /feedbacks type report) crée un signalement ; les admins le voient et reçoivent une push', async () => {
     const { organizationId, admin } = await createOrgWithAdmin(app, 'Conciergerie');
     const jetonAdmin = await enregistrerAppareil(app, admin.id);
     const marie = await createUser(app, { organizationId, role: 'prestataire' });
     const sofia = await createUser(app, { organizationId, role: 'prestataire' });
     const logementId = await createLogement(app, { organizationId, createdBy: admin.id });
-    const menageId = await createMenage(app, { logementId, organizationId, createdBy: admin.id });
+    const menageId = await createMenage(app, { logementId, organizationId, createdBy: admin.id, prestataireUserId: marie.id });
     const [comment] = await app
       .db('comment')
       .insert({ menage_id: menageId, author_id: sofia.id, content: 'Propos déplacés' })
@@ -154,16 +154,26 @@ describe('signalement de contenu (App Store 1.2)', () => {
       },
     });
     expect(res.statusCode).toBe(201);
-    expect(res.json()).toMatchObject({ type: 'report', target_type: 'comment', target_id: comment.id, status: 'new' });
+    expect(res.json()).toMatchObject({
+      target_type: 'comment',
+      target_id: comment.id,
+      target_user_id: sofia.id,
+      reason: 'other',
+      comment: 'Ce commentaire contient des propos déplacés envers un collègue.',
+      status: 'pending',
+    });
 
-    const liste = await app.inject({ method: 'GET', url: '/feedbacks?type=report', headers: auth(admin.token) });
+    const liste = await app.inject({ method: 'GET', url: '/reports', headers: auth(admin.token) });
     expect(liste.statusCode).toBe(200);
     expect(liste.json().data.map((f: { id: string }) => f.id)).toContain(res.json().id);
+    // Les bugs et suggestions ne s'y mêlent plus.
+    const feedbacks = await app.inject({ method: 'GET', url: '/feedbacks?type=report', headers: auth(admin.token) });
+    expect(feedbacks.json().data).toHaveLength(0);
 
     await laisserPartirLesPush();
     expect(push.messages.map((m) => m.to)).toEqual([jetonAdmin]);
     expect(push.messages[0].title).toBe('Contenu signalé');
-    expect(push.messages[0].data).toMatchObject({ type: 'content_report', feedback_id: res.json().id });
+    expect(push.messages[0].data).toMatchObject({ type: 'content_report', report_id: res.json().id });
   });
 
   it('un bug ou une suggestion ne déclenche pas de push admin', async () => {

@@ -232,6 +232,58 @@ INDEX : `(menage_id, taken_at)`, `(section_id)`.
 
 INDEX : `(menage_id, created_at)`, `(section_id)`.
 
+### `comment` (ajouts 20261009120000)
+- `reply_to_id` uuid FK comment **SET NULL** — message cité par une réponse ; la réponse survit à la suppression de l'original. INDEX `idx_comment_reply_to`.
+
+### `comment_reaction`
+Réactions emoji (migration 20261009120000). Une ligne par personne, message et emoji ; l'unicité fait de la réaction un interrupteur.
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| comment_id | uuid FK comment CASCADE notnull | |
+| user_id | uuid FK user CASCADE notnull | |
+| emoji | varchar(16) notnull | liste fermée : 👍 ❤️ 😂 😮 😢 🙏 🔥 |
+| created_at | timestamp | |
+
+UNIQUE `uq_comment_reaction (comment_id, user_id, emoji)` · INDEX `(comment_id)`.
+
+### `report`
+Signalements de contenu (migration 20261009120100, reprise de Buildr). Cible désignée par type + id **sans FK** (elle est souvent supprimée, le signalement survit) ; `target_excerpt` fige son contenu. Reprend les anciens `feedback` de type `report` (motif `other`, statut `new`/`in_progress` → `pending`, `resolved` → `resolved`, `declined` → `dismissed`), qui sont retirés de `feedback`.
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| organization_id | uuid FK organization CASCADE notnull | |
+| menage_id | uuid FK menage SET NULL | prestation du message / de la photo |
+| reporter_id | uuid FK user CASCADE notnull | |
+| target_type | varchar(20) notnull | `comment` \| `photo` \| `user` |
+| target_id | uuid notnull | |
+| target_user_id | uuid FK user SET NULL | personne visée (auteur du contenu) |
+| target_excerpt | text | contenu au moment du signalement (300 car.) |
+| reason | varchar(30) notnull | `inappropriate` \| `harassment` \| `off_topic` \| `other` |
+| comment | text | précision du rapporteur |
+| status | varchar(20) notnull défaut `pending` | `pending` \| `resolved` \| `dismissed` |
+| escalated | boolean notnull défaut false | personne visée admin → remonte à la console |
+| resolved_by | uuid FK user SET NULL | |
+| resolved_at | timestamp | |
+| resolution_note | text | |
+| created_at, updated_at | timestamp | |
+
+INDEX `(organization_id, status)`, `(target_type, target_id)`.
+
+### `user_block`
+Blocages entre utilisateurs (migration 20261009120200). Personnel et silencieux : masque messages et photos de `blocked_id` pour `blocker_id`.
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| blocker_id | uuid FK user CASCADE notnull | |
+| blocked_id | uuid FK user CASCADE notnull | |
+| created_at | timestamp | |
+
+UNIQUE `(blocker_id, blocked_id)` · INDEX `(blocker_id)`.
+
 ### `comment_mention`
 Personnes mentionnées (« @Prénom Nom ») dans un commentaire (migration 20261009090000). Le texte garde le nom en clair ; la table sert à notifier et à surligner.
 
@@ -635,7 +687,21 @@ Backfill : pour les rows existantes non-prestataire, les 3 flags sont mis à `tr
 - `laundry_provider_price` decimal(10,2)
 
 ### `user` (ajout préférences notifs)
-- `notification_prefs` jsonb notnull défaut `{}` — préférences push par catégorie ; une catégorie est coupée si sa valeur vaut `false` (migration 20260614110000). Catégories : assignment, available, reminders, reschedule, presence, pointage, validation, comments, consumables, invitations.
+- `notification_prefs` jsonb notnull défaut `{}` — préférences push par catégorie ; une catégorie est coupée si sa valeur vaut `false` (migration 20260614110000). Catégories : assignment, available, reminders, reschedule, presence, pointage, validation, comments, mentions, consumables, invitations, reports.
+- `push_enabled` boolean notnull défaut true — interrupteur général : `false` coupe toutes les push (migration 20261009130000).
+
+### `logement_notification_level`
+Réglage des notifications d'un utilisateur pour un logement (migration 20261009130000). Une ligne n'existe que pour un logement qui n'est pas sur « tout ».
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| user_id | uuid FK user CASCADE notnull | |
+| logement_id | uuid FK logement CASCADE notnull | |
+| level | varchar(16) notnull | CHECK `important` (mentions, affectation, rappels) \| `none` |
+| created_at, updated_at | timestamp | |
+
+UNIQUE `(user_id, logement_id)` · INDEX `(logement_id)`.
 
 ### `menage` (ajouts rappels push)
 - `reminder_eve_sent_at` timestamp — rappel « veille 18h » envoyé (ou relance si non assigné). Anti-doublon worker.

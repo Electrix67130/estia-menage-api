@@ -32,7 +32,7 @@ export default fp(
         listPhotosSchema.parse(request.query);
       if (menage_id) {
         await requireMenageAccess(fastify.db, request.user.sub, menage_id, 'view_photos');
-        const result = await service.findByMenage(menage_id, { page, limit, section_id });
+        const result = await service.findByMenage(menage_id, { page, limit, section_id, viewerId: request.user.sub });
         return { ...result, data: signUrlsInList(result.data) };
       }
       // Photos d'un logement : doit être membre ou admin de l'org du logement

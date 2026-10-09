@@ -102,6 +102,18 @@ export default fp(
         return reply.code(403).send({ statusCode: 403, error: 'Forbidden', message: 'Cannot modify other users' });
       }
 
+      // Un admin ne modifie que les membres de SON organisation : sans ce
+      // contrôle, un admin de n'importe quelle conciergerie pouvait désactiver
+      // un compte ou changer le rôle de quelqu'un ailleurs. 404 et non 403 :
+      // on ne confirme pas l'existence d'un compte d'une autre organisation.
+      if (!isSelf) {
+        const member = await fastify
+          .db('organization_member')
+          .where({ organization_id: editorMembership!.organization_id, user_id: id })
+          .first();
+        if (!member) return reply.notFound('User not found');
+      }
+
       if (!isAdmin) {
         for (const field of ADMIN_ONLY_FIELDS) {
           if (field in data) {

@@ -949,14 +949,15 @@ Discussion liée à un ménage, optionnellement scopée à une section.
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/comments?menage_id=&section_id=` | Liste (affecté au ménage OU `view_comments`) — section_id='general' pour hors-section. Chaque commentaire porte `mentions: [{ user_id, first_name, last_name }]` |
+| GET | `/comments?menage_id=&section_id=` | Liste (affecté au ménage OU `view_comments`) — section_id='general' pour hors-section. Chaque commentaire porte `mentions: [{ user_id, first_name, last_name }]`, `reply_to: { id, content, author_id, first_name, last_name } \| null` (null aussi si le message cité a été supprimé ou si son auteur est bloqué) et `reactions: [{ emoji, count, mine }]`. Les messages des personnes bloquées par le lecteur sont omis |
 | GET | `/comments/mentionable?menage_id=` | Personnes qu'on peut mentionner : `[{ id, first_name, last_name, avatar_url }]` |
 | GET | `/comments/:id` | Détail |
-| POST | `/comments` | Crée un commentaire (`mentioned_user_ids?: uuid[]`, 20 max) |
+| POST | `/comments` | Crée un commentaire (`mentioned_user_ids?: uuid[]`, 20 max ; `reply_to_id?` = message cité, **de la même prestation** sinon 400) |
+| POST | `/comments/:id/reactions` | **Interrupteur** `{ emoji }` parmi `👍 ❤️ 😂 😮 😢 🙏 🔥` : ajoute ou retire SA réaction → `{ comment_id, reactions }`. Même accès que la lecture |
 | PATCH | `/comments/:id` | Édite (auteur uniquement) ; `mentioned_user_ids` remplace les mentions |
 | DELETE | `/comments/:id` | Supprime (auteur ou edit perm) |
 
-**Mentions** : le texte contient le nom en clair (« @Prénom Nom ») et `mentioned_user_ids` dit qui est visé. Seules les personnes qui **suivent la prestation** sont mentionnables — les destinataires de ses notifications (créateur, admins, prestas affectés, managers/propriétaires), comptes actifs, hors auteur ; un presta simplement membre du logement n'en fait pas partie. Un id hors de cette liste est **ignoré sans erreur**. La personne mentionnée reçoit une push **« X t'a mentionné »** (`type: comment_mention`, corps = début du message) **à la place** de « Nouveau commentaire », et ce **même si elle a coupé la catégorie `comments`** (une mention s'adresse à elle nommément). À l'édition, seules les personnes ajoutées sont notifiées.
+**Mentions** : le texte contient le nom en clair (« @Prénom Nom ») et `mentioned_user_ids` dit qui est visé. Seules les personnes qui **suivent la prestation** sont mentionnables — les destinataires de ses notifications (créateur, admins, prestas affectés, managers/propriétaires), comptes actifs, hors auteur ; un presta simplement membre du logement n'en fait pas partie. Un id hors de cette liste est **ignoré sans erreur**. La personne mentionnée reçoit une push **« X t'a mentionné »** (`type: comment_mention`, corps = début du message) **à la place** de « Nouveau commentaire », et ce **même si elle a coupé la catégorie `comments`** : les mentions ont leur propre catégorie `mentions`. À l'édition, seules les personnes ajoutées sont notifiées.
 
 ---
 
@@ -1067,6 +1068,24 @@ bloqué au login (`auth.service`) **et** ses sessions sont supprimées.
 UPDATE "user" SET is_super_admin = true WHERE email = 'julien@…';
 ```
 
+## Signalements de contenu & blocages
+
+Repris de Buildr (09/10/2026). Exigences App Store 1.2 : signaler un contenu, bloquer un utilisateur.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| POST | `/reports` | Signaler `{ target_type: comment\|photo\|user, target_id, reason: inappropriate\|harassment\|off_topic\|other, comment? }`. **404** si la cible n'existe pas ou n'est pas visible du rapporteur (message/photo : accès à la prestation ; membre : une organisation en commun), **400** sur soi-même. **Idempotent** : un signalement en attente du même rapporteur sur la même cible est renvoyé (200). Push **« Contenu signalé »** (`type: content_report`, `report_id`, corps = nom du logement) aux **admins de l'org** — jamais la personne visée ni le rapporteur. Personne visée admin → `escalated: true`, et la console super admin est aussi prévenue. |
+| GET | `/reports?status=&menage_id=&page=&limit=` | Signalements de l'org (**admin**) → `{ data, meta, counts: { pending } }`. Chaque ligne : rapporteur, personne visée, logement, date de la prestation, `target_excerpt` (contenu figé au moment du signalement), `target_exists` (faux une fois le contenu supprimé). Un admin **ne voit jamais un signalement qui le vise**. |
+| PATCH | `/reports/:id` | `{ status: resolved\|dismissed, resolution_note? }` — admin de l'org (sauf la personne visée → 404) ou super admin |
+| GET | `/super-admin/reports?status=&escalated=1&organization_id=` | Tous les signalements (console) |
+| GET | `/blocks` | Les personnes que j'ai bloquées `{ data: [{ user_id, first_name, last_name, created_at }] }` |
+| POST | `/blocks` | Bloquer `{ user_id }` — une organisation en commun, sinon 404 ; soi-même → 400 |
+| DELETE | `/blocks/:userId` | Débloquer |
+
+**Effet d'un blocage** : personnel et silencieux. Les messages (et leurs citations dans les réponses d'autrui) et les photos de prestation de la personne bloquée ne sont plus servis à celui qui bloque (`GET /comments`, `GET /photos?menage_id=`). Elle n'est pas prévenue et continue de travailler.
+
+---
+
 ## Feedback (bugs & suggestions)
 
 Signalements envoyés par les utilisateurs depuis le mobile ou le dashboard. Traitement au niveau de
@@ -1074,7 +1093,7 @@ l'**organisation** : les admins voient les signalements de leurs membres et y r�
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| POST | `/feedbacks` | Déposer un bug, une suggestion ou un **signalement de contenu** (`type: report`, avec `target_type` = `comment`\|`photo` et `target_id`) — tout utilisateur connecté. Un `report` déclenche une **push « Contenu signalé »** aux admins de l'org (hors auteur) ; les admins le retrouvent via `GET /feedbacks?type=report` pour supprimer le contenu ou écarter son auteur (App Store 1.2). |
+| POST | `/feedbacks` | Déposer un bug ou une suggestion — tout utilisateur connecté. **`type: report` est un ancien chemin** (apps antérieures au 09/10) : il est redirigé vers `POST /reports` (motif `other`, `message` → `comment`) et renvoie le signalement créé. Utiliser `/reports`. |
 | GET | `/feedbacks/mine` | Ses propres signalements + les réponses reçues |
 | GET | `/feedbacks/mine/:id` | Détail d'un de ses signalements (404 si ce n'est pas le sien) |
 | GET | `/feedbacks?status=&type=&q=` | Signalements de l'org, filtrables (**admin**) → `{ data, meta, counts }` |
@@ -1112,14 +1131,22 @@ Statuts : `new` · `in_progress` · `resolved` · `declined`. La liste admin tri
 
 ## Préférences de notifications
 
-Chaque utilisateur peut couper certaines catégories de push. Par défaut tout est activé ; `sendPushToUsers` filtre les destinataires selon leur préférence pour la catégorie du `data.type`.
+Trois niveaux (inspirés de Buildr, 09/10/2026), du plus large au plus fin ; tout est actif par défaut. `sendPushToUsers` filtre chaque push dans cet ordre (`lib/notification-preferences.ts`) :
+
+1. **Interrupteur général** `push_enabled` : `false` coupe **tout**, mentions et réponses du support comprises.
+2. **Catégorie** du `data.type` : coupée partout si `false`.
+3. **Logement** de la push (`data.logement_id`, ou celui de `data.menage_id`) : `all` (défaut), `important` (seulement `mentions`, `assignment`, `reminders` — ce qui me concerne personnellement), `none` (rien).
+
+Un type sans catégorie (`feedback_reply`) n'est filtré que par l'interrupteur général.
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/notification-preferences` | État de chaque catégorie (`{ assignment: true, comments: false, … }`). Authentifié. |
-| PATCH | `/notification-preferences` | Active/désactive une catégorie — body `{ key, enabled }`. |
+| GET | `/notification-preferences` | `{ <catégorie>: bool, …, push_enabled: bool, logements: [{ logement_id, logement_name, level }] }` — catégories **à plat** (forme lue par les apps déjà installées) ; `logements` ne liste que ceux qui ne sont pas sur « tout ». |
+| PATCH | `/notification-preferences` | `{ key, enabled }` (une catégorie) **ou** `{ push_enabled }` (tout). |
+| GET | `/notification-preferences/logements/:logementId` | `{ logement_id, level }` — logement de son organisation active, sinon 404 |
+| PUT | `/notification-preferences/logements/:logementId` | `{ level: all\|important\|none }` — `all` supprime le réglage |
 
-Catégories : `assignment` (assigné/modifié/annulé/retiré), `available` (dispo + relances), `reminders` (rappels veille/2h), `reschedule` (reports), `presence` (présent/absent), `pointage` (arrivée/départ), `validation`, `comments`, `consumables`, `invitations`.
+Catégories : `assignment` (assigné/modifié/annulé/retiré), `available` (dispo + relances), `reminders` (rappels veille/2h, lits à renseigner), `reschedule` (reports), `presence` (présent/absent), `pointage` (arrivée/départ), `validation`, `comments`, `mentions` (« X t'a mentionné » — **indépendante de `comments`**), `consumables`, `invitations`, `reports` (contenus signalés, admins).
 
 ## Pages web (pont email → app)
 

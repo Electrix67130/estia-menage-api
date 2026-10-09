@@ -1,6 +1,7 @@
 import { Knex } from 'knex';
 import BaseService, { PaginationOptions, PaginatedResult } from '@/lib/base-service';
 import { PhotoRow } from './photo.schema';
+import { blockedIdsFor } from '@/lib/blocks';
 
 class PhotoService extends BaseService<PhotoRow> {
   constructor(db: Knex) {
@@ -9,14 +10,19 @@ class PhotoService extends BaseService<PhotoRow> {
 
   async findByMenage(
     menageId: string,
-    options: PaginationOptions & { section_id?: string } = {},
+    options: PaginationOptions & { section_id?: string; viewerId?: string } = {},
   ): Promise<PaginatedResult<PhotoRow & { first_name: string; last_name: string }>> {
-    const { page = 1, limit = 20, orderBy = 'created_at', order = 'desc', section_id } = options;
+    const { page = 1, limit = 20, orderBy = 'created_at', order = 'desc', section_id, viewerId } = options;
     const offset = (page - 1) * limit;
 
+    // Les photos des personnes que le lecteur a bloquées ne lui sont pas servies.
+    const blocked = await blockedIdsFor(this.db, viewerId);
     const baseQuery = this.db(this.table)
       .join('user', 'photo.uploaded_by', 'user.id')
-      .where('photo.menage_id', menageId);
+      .where('photo.menage_id', menageId)
+      .modify((qb) => {
+        if (blocked.length > 0) qb.whereNotIn('photo.uploaded_by', blocked);
+      });
 
     if (section_id) {
       baseQuery.andWhere('photo.section_id', section_id);
