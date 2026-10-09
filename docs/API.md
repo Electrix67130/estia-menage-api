@@ -949,11 +949,14 @@ Discussion liée à un ménage, optionnellement scopée à une section.
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET | `/comments?menage_id=&section_id=` | Liste (affecté au ménage OU `view_comments`) — section_id='general' pour hors-section |
+| GET | `/comments?menage_id=&section_id=` | Liste (affecté au ménage OU `view_comments`) — section_id='general' pour hors-section. Chaque commentaire porte `mentions: [{ user_id, first_name, last_name }]` |
+| GET | `/comments/mentionable?menage_id=` | Personnes qu'on peut mentionner : `[{ id, first_name, last_name, avatar_url }]` |
 | GET | `/comments/:id` | Détail |
-| POST | `/comments` | Crée un commentaire |
-| PATCH | `/comments/:id` | Édite (auteur uniquement) |
+| POST | `/comments` | Crée un commentaire (`mentioned_user_ids?: uuid[]`, 20 max) |
+| PATCH | `/comments/:id` | Édite (auteur uniquement) ; `mentioned_user_ids` remplace les mentions |
 | DELETE | `/comments/:id` | Supprime (auteur ou edit perm) |
+
+**Mentions** : le texte contient le nom en clair (« @Prénom Nom ») et `mentioned_user_ids` dit qui est visé. Seules les personnes qui **suivent la prestation** sont mentionnables — les destinataires de ses notifications (créateur, admins, prestas affectés, managers/propriétaires), comptes actifs, hors auteur ; un presta simplement membre du logement n'en fait pas partie. Un id hors de cette liste est **ignoré sans erreur**. La personne mentionnée reçoit une push **« X t'a mentionné »** (`type: comment_mention`, corps = début du message) **à la place** de « Nouveau commentaire », et ce **même si elle a coupé la catégorie `comments`** (une mention s'adresse à elle nommément). À l'édition, seules les personnes ajoutées sont notifiées.
 
 ---
 

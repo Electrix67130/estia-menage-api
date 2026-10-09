@@ -5,6 +5,7 @@ import { createCommentSchema, updateCommentSchema } from './comment.schema';
 import { requireMenageAccess, requirePermissionForMenage } from '@/lib/permissions';
 import { emitToMenage, getMenageRecipientIds } from '@/lib/realtime-hub';
 import { sendPushToUsers } from '@/lib/push';
+import type { Knex } from 'knex';
 
 const byMenageSchema = z.object({
   menage_id: z.string().uuid(),
@@ -17,6 +18,32 @@ const byMenageSchema = z.object({
 });
 
 const uuidSchema = z.object({ id: z.string().uuid() });
+const mentionableSchema = z.object({ menage_id: z.string().uuid() });
+
+const MENTION_EXCERPT_MAX = 140;
+
+async function authorName(db: Knex, userId: string): Promise<string> {
+  const author = await db('user').where({ id: userId }).select('first_name', 'last_name').first();
+  return author ? `${author.first_name} ${author.last_name}`.trim() : 'Quelqu’un';
+}
+
+/** « X t'a mentionné » avec le début du message : une mention appelle une réponse. */
+async function notifyMentioned(
+  db: Knex,
+  userIds: string[],
+  menageId: string,
+  authorId: string,
+  content: string,
+): Promise<void> {
+  if (userIds.length === 0) return;
+  const name = await authorName(db, authorId);
+  const excerpt = content.length > MENTION_EXCERPT_MAX ? `${content.slice(0, MENTION_EXCERPT_MAX - 1)}…` : content;
+  await sendPushToUsers(db, userIds, {
+    title: `${name} t’a mentionné`,
+    body: excerpt,
+    data: { menage_id: menageId, type: 'comment_mention' },
+  });
+}
 
 export default fp(
   (fastify, _opts, done) => {
@@ -27,6 +54,13 @@ export default fp(
       const { menage_id, section_id, ...pagination } = byMenageSchema.parse(request.query);
       await requireMenageAccess(fastify.db, request.user.sub, menage_id, 'view_comments');
       return service.findByMenage(menage_id, { ...pagination, sectionId: section_id });
+    });
+
+    // GET /comments/mentionable?menage_id=xxx — personnes qu'on peut mentionner (« @ »)
+    fastify.get('/comments/mentionable', { preHandler: [fastify.authenticate] }, async (request) => {
+      const { menage_id } = mentionableSchema.parse(request.query);
+      await requireMenageAccess(fastify.db, request.user.sub, menage_id, 'view_comments');
+      return service.findMentionable(menage_id, request.user.sub);
     });
 
     fastify.get('/comments/:id', { preHandler: [fastify.authenticate] }, async (request, reply) => {
@@ -61,7 +95,12 @@ export default fp(
         }
       }
 
-      const comment = await service.create({ ...data, author_id: request.user.sub });
+      const { mentioned_user_ids = [], ...fields } = data;
+      const comment = await service.create({ ...fields, author_id: request.user.sub });
+      const mentioned =
+        mentioned_user_ids.length > 0
+          ? await service.setMentions(comment.id, data.menage_id, request.user.sub, mentioned_user_ids)
+          : [];
       emitToMenage(fastify.db, data.menage_id, {
         type: 'comment.created',
         menage_id: data.menage_id,
@@ -69,15 +108,16 @@ export default fp(
         actor_id: request.user.sub,
       }).catch((err) => fastify.log.error({ err }, 'WS emit failed'));
 
-      // Notification push aux participants du menage (hors auteur).
+      // Notification push aux participants du menage (hors auteur). Les personnes
+      // mentionnées reçoivent la notification de mention à la place (pas les deux).
       (async () => {
-        const recipients = await getMenageRecipientIds(fastify.db, data.menage_id, request.user.sub);
+        await notifyMentioned(fastify.db, mentioned, data.menage_id, request.user.sub, data.content);
+        const mentionedSet = new Set(mentioned);
+        const recipients = (await getMenageRecipientIds(fastify.db, data.menage_id, request.user.sub)).filter(
+          (id) => !mentionedSet.has(id),
+        );
         if (recipients.length === 0) return;
-        const author = await fastify.db('user')
-          .where({ id: request.user.sub })
-          .select('first_name', 'last_name')
-          .first();
-        const name = author ? `${author.first_name} ${author.last_name}`.trim() : 'Quelqu’un';
+        const name = await authorName(fastify.db, request.user.sub);
         await sendPushToUsers(fastify.db, recipients, {
           title: 'Nouveau commentaire',
           body: `${name} a commenté un ménage.`,
@@ -85,7 +125,7 @@ export default fp(
         });
       })().catch((err) => fastify.log.error({ err }, 'push comment failed'));
 
-      return reply.code(201).send(comment);
+      return reply.code(201).send({ ...comment, mentions: await service.mentionsOf(comment.id) });
     });
 
     fastify.patch('/comments/:id', { preHandler: [fastify.authenticate] }, async (request, reply) => {
@@ -100,14 +140,22 @@ export default fp(
           message: 'Only the author can edit this comment',
         });
       }
-      const comment = await service.update(id, data);
+      const { mentioned_user_ids, ...fields } = data;
+      const comment = await service.update(id, fields);
+      if (mentioned_user_ids) {
+        // Seules les personnes ajoutées à l'édition sont notifiées.
+        const added = await service.setMentions(id, existing.menage_id, request.user.sub, mentioned_user_ids);
+        notifyMentioned(fastify.db, added, existing.menage_id, request.user.sub, comment?.content ?? existing.content).catch(
+          (err) => fastify.log.error({ err }, 'push mention failed'),
+        );
+      }
       emitToMenage(fastify.db, existing.menage_id, {
         type: 'comment.updated',
         menage_id: existing.menage_id,
         resource_id: id,
         actor_id: request.user.sub,
       }).catch((err) => fastify.log.error({ err }, 'WS emit failed'));
-      return comment;
+      return { ...comment, mentions: await service.mentionsOf(id) };
     });
 
     fastify.delete('/comments/:id', { preHandler: [fastify.authenticate] }, async (request, reply) => {

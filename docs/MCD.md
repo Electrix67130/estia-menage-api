@@ -232,6 +232,18 @@ INDEX : `(menage_id, taken_at)`, `(section_id)`.
 
 INDEX : `(menage_id, created_at)`, `(section_id)`.
 
+### `comment_mention`
+Personnes mentionnées (« @Prénom Nom ») dans un commentaire (migration 20261009090000). Le texte garde le nom en clair ; la table sert à notifier et à surligner.
+
+| Col | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| comment_id | uuid FK comment CASCADE notnull | |
+| user_id | uuid FK user CASCADE notnull | personne mentionnée |
+| created_at | timestamp | |
+
+UNIQUE `(comment_id, user_id)` · INDEX `(user_id)`.
+
 ### `client`
 **Fiche-annuaire pure** (facturation). Pas de compte/login : un client est une entrée d'annuaire admin-only, jamais un utilisateur authentifié. Le rôle global `client` a été supprimé (migration 20260528120000).
 
@@ -664,6 +676,7 @@ organization (id)
 │     ├─ menage_prestataire (menage_id, user_id) — multi-affectation (1er = référent)
 │     ├─ photo (menage_id?, section_id?) → user (uploaded_by)
 │     └─ comment (menage_id, section_id?) → user (author_id)
+│           └─ comment_mention (comment_id) → user (user_id)
 ├─ prestataire_weekly_availability (organization_id, user_id) — dispo hebdo du presta
 └─ invitation (organization_id) → user (invited_by)
 

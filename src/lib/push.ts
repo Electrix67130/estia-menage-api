@@ -46,6 +46,8 @@ const CATEGORY_FOR_TYPE: Record<string, NotificationCategory> = {
   departure: 'pointage',
   validated: 'validation',
   comment: 'comments',
+  // `comment_mention` volontairement hors catégorie : une mention s'adresse à la
+  // personne nommément, elle arrive même si les commentaires sont coupés.
   consumables_low: 'consumables',
   invitation_accepted: 'invitations',
 };

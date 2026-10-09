@@ -209,6 +209,109 @@ describe('commentaires', () => {
     expect((await app.inject({ method: 'DELETE', url: `/comments/${commentaire.id}`, headers: auth(admin.token) })).statusCode).toBe(204);
   });
 
+  describe('mentions', () => {
+    async function mentionner(token: string, menageId: string, content: string, ids: string[]) {
+      return app.inject({
+        method: 'POST',
+        url: '/comments',
+        headers: auth(token),
+        payload: { menage_id: menageId, content, mentioned_user_ids: ids },
+      });
+    }
+
+    it('on ne peut mentionner que les personnes qui suivent la prestation, hors soi-même', async () => {
+      const { admin, titulaire, collegue, etranger, menageId } = await contexte();
+      const res = await app.inject({
+        method: 'GET',
+        url: `/comments/mentionable?menage_id=${menageId}`,
+        headers: auth(titulaire.token),
+      });
+      expect(res.statusCode).toBe(200);
+      const ids = (res.json() as { id: string }[]).map((u) => u.id);
+      expect(ids).toContain(admin.id);
+      expect(ids).not.toContain(titulaire.id);
+      // Membre du logement mais pas affecté : il ne suit pas cette prestation.
+      expect(ids).not.toContain(collegue.id);
+      expect(ids).not.toContain(etranger.id);
+
+      const refuse = await app.inject({
+        method: 'GET',
+        url: `/comments/mentionable?menage_id=${menageId}`,
+        headers: auth(etranger.token),
+      });
+      expect(refuse.statusCode).toBe(403);
+    });
+
+    it('la personne mentionnée reçoit « X t’a mentionné » à la place de la notification générique', async () => {
+      const { admin, titulaire, menageId } = await contexte();
+      const jetonAdmin = await enregistrerAppareil(app, admin.id);
+
+      const res = await mentionner(titulaire.token, menageId, '@Test admin il manque le linge', [admin.id]);
+      expect(res.statusCode).toBe(201);
+      expect(res.json().mentions).toEqual([{ user_id: admin.id, first_name: expect.any(String), last_name: expect.any(String) }]);
+
+      await laisserPartirLesPush();
+      expect(push.messages).toHaveLength(1);
+      expect(push.messages[0]).toMatchObject({
+        to: jetonAdmin,
+        title: 'Test prestataire t’a mentionné',
+        body: '@Test admin il manque le linge',
+        data: { type: 'comment_mention', menage_id: menageId },
+      });
+
+      const liste = await app.inject({ method: 'GET', url: `/comments?menage_id=${menageId}`, headers: auth(titulaire.token) });
+      expect(liste.json().data[0].mentions).toEqual([expect.objectContaining({ user_id: admin.id })]);
+    });
+
+    it('une mention arrive même si les commentaires sont coupés dans les préférences', async () => {
+      const { admin, titulaire, menageId } = await contexte();
+      await enregistrerAppareil(app, admin.id);
+      await app.db('user').where({ id: admin.id }).update({ notification_prefs: { comments: false } });
+
+      await commenter(titulaire.token, menageId, 'Sans mention');
+      await mentionner(titulaire.token, menageId, '@Test admin regarde ça', [admin.id]);
+
+      await laisserPartirLesPush();
+      expect(push.messages.map((m) => m.data.type)).toEqual(['comment_mention']);
+    });
+
+    it('une personne qui ne suit pas la prestation est ignorée, sans erreur', async () => {
+      const { titulaire, collegue, etranger, menageId } = await contexte();
+      await enregistrerAppareil(app, collegue.id);
+      await enregistrerAppareil(app, etranger.id);
+
+      const res = await mentionner(titulaire.token, menageId, 'Coucou', [collegue.id, etranger.id]);
+      expect(res.statusCode).toBe(201);
+      expect(res.json().mentions).toEqual([]);
+
+      await laisserPartirLesPush();
+      expect(push.messages).toHaveLength(0);
+    });
+
+    it('à l’édition, seules les personnes ajoutées sont notifiées', async () => {
+      const { admin, titulaire, collegue, menageId } = await contexte();
+      await app.db('menage_prestataire').insert({ menage_id: menageId, user_id: collegue.id });
+      const jetonAdmin = await enregistrerAppareil(app, admin.id);
+      const jetonCollegue = await enregistrerAppareil(app, collegue.id);
+      const commentaire = (await mentionner(titulaire.token, menageId, '@Test admin', [admin.id])).json();
+      await laisserPartirLesPush();
+      push.messages.length = 0;
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/comments/${commentaire.id}`,
+        headers: auth(titulaire.token),
+        payload: { content: '@Test admin @Test prestataire', mentioned_user_ids: [admin.id, collegue.id] },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().mentions).toHaveLength(2);
+
+      await laisserPartirLesPush();
+      expect(push.messages.map((m) => m.to)).toEqual([jetonCollegue]);
+      expect(push.messages.map((m) => m.to)).not.toContain(jetonAdmin);
+    });
+  });
+
   it('sépare le fil général des commentaires d’étape', async () => {
     const { titulaire, menageId } = await contexte();
     const [section] = await app
