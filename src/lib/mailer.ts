@@ -111,3 +111,56 @@ export function buildInvitationEmail(params: {
     }),
   };
 }
+
+/** Échappe un texte saisi par un utilisateur avant de l'insérer dans un e-mail HTML. */
+export function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Nouveau bug ou nouvelle suggestion → boîte support. Sans ce mail, rien ne
+ * prévenait de leur arrivée : il fallait aller voir la console.
+ */
+export function buildFeedbackNotificationEmail(params: {
+  type: 'bug' | 'suggestion';
+  subject: string;
+  message: string;
+  authorName: string;
+  authorEmail: string;
+  organizationName: string | null;
+  platform: string | null;
+  appVersion: string | null;
+  screen: string | null;
+  locale: string | null;
+}): { subject: string; html: string } {
+  const label = params.type === 'bug' ? 'Bug' : 'Suggestion';
+  const context = [
+    params.platform ? `Plateforme : ${escapeHtml(params.platform)}` : null,
+    params.appVersion ? `Version : ${escapeHtml(params.appVersion)}` : null,
+    params.screen ? `Écran : ${escapeHtml(params.screen)}` : null,
+    params.locale ? `Langue : ${escapeHtml(params.locale)}` : null,
+  ].filter(Boolean);
+  const row = (k: string, v: string) =>
+    `<tr><td style="color: #64748B; padding: 2px 12px 2px 0; vertical-align: top;">${k}</td><td style="color: #0F172A;">${v}</td></tr>`;
+
+  return {
+    subject: `[${label}] ${params.subject}`,
+    html: buildBrandedEmail({
+      heading: `${label} : ${escapeHtml(params.subject)}`,
+      bodyHtml: `
+        <table style="font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+          ${row('De', `${escapeHtml(params.authorName)} — <a href="mailto:${escapeHtml(params.authorEmail)}" style="color: ${BRAND};">${escapeHtml(params.authorEmail)}</a>`)}
+          ${row('Organisation', escapeHtml(params.organizationName ?? '—'))}
+        </table>
+        <div style="background: #F8FAFC; border-left: 3px solid ${BRAND}; padding: 12px 16px; color: #0F172A; line-height: 1.6; white-space: pre-wrap;">${escapeHtml(params.message)}</div>`,
+      ctaLabel: 'Ouvrir dans la console',
+      ctaUrl: `${env.DASHBOARD_URL}/admin/feedback`,
+      footnoteHtml: context.length > 0 ? context.join(' · ') : undefined,
+    }),
+  };
+}

@@ -9,6 +9,8 @@ import {
 } from './feedback.schema';
 import { getActiveMembership } from '@/lib/active-membership';
 import { notifyFeedbackReply } from '@/lib/push';
+import { buildFeedbackNotificationEmail, sendMail } from '@/lib/mailer';
+import env from '@/config/env';
 
 const uuidParamSchema = z.object({ id: z.string().uuid() });
 const minePaginationSchema = z.object({
@@ -74,6 +76,27 @@ export default fp(
           target_id: data.target_id ?? null,
         })
         .returning('*');
+
+      // Prévient la boîte support (bugs et suggestions) : sans ce mail, rien ne
+      // signalait leur arrivée. En tâche de fond : un SMTP en panne ne doit pas
+      // faire échouer l'envoi du signalement.
+      (async () => {
+        const full = await service.findByIdForSupport(feedback.id);
+        if (!full || (full.type !== 'bug' && full.type !== 'suggestion')) return;
+        const mail = buildFeedbackNotificationEmail({
+          type: full.type,
+          subject: full.subject,
+          message: full.message,
+          authorName: `${full.author_first_name ?? ''} ${full.author_last_name ?? ''}`.trim() || '—',
+          authorEmail: full.author_email ?? '—',
+          organizationName: full.organization_name ?? null,
+          platform: full.platform,
+          appVersion: full.app_version,
+          screen: full.screen,
+          locale: full.locale,
+        });
+        await sendMail({ to: env.SUPPORT_EMAIL, ...mail });
+      })().catch((err) => fastify.log.error({ err }, 'feedback support mail failed'));
 
       return reply.code(201).send(feedback);
     });

@@ -21,6 +21,8 @@ const envSchema = z.object({
   APP_URL: z.string().default('http://localhost:3001'),
   /** URL du dashboard web (pour rediriger après reset de mot de passe, etc.). */
   DASHBOARD_URL: z.string().default('https://app.estia-clean-connect.fr'),
+  /** Boîte qui reçoit chaque bug et suggestion envoyé depuis les apps. */
+  SUPPORT_EMAIL: z.string().default('contact@estiaconciergerie.fr'),
   STORAGE_MODE: z.enum(['local', 's3']).default('local'),
   S3_ENDPOINT: z.string().default(''),
   S3_BUCKET: z.string().default(''),

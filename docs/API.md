@@ -1093,7 +1093,7 @@ l'**organisation** : les admins voient les signalements de leurs membres et y r�
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| POST | `/feedbacks` | Déposer un bug ou une suggestion — tout utilisateur connecté. **`type: report` est un ancien chemin** (apps antérieures au 09/10) : il est redirigé vers `POST /reports` (motif `other`, `message` → `comment`) et renvoie le signalement créé. Utiliser `/reports`. |
+| POST | `/feedbacks` | Déposer un bug ou une suggestion — tout utilisateur connecté. Chaque bug/suggestion envoie un **e-mail à la boîte support** (`SUPPORT_EMAIL`, défaut `contact@estiaconciergerie.fr`) : sujet `[Bug] …` / `[Suggestion] …`, auteur, organisation, message (HTML échappé), contexte technique et lien vers la console — en tâche de fond, un SMTP en panne ne fait pas échouer l'envoi. **`type: report` est un ancien chemin** (apps antérieures au 09/10) : il est redirigé vers `POST /reports` (motif `other`, `message` → `comment`) et renvoie le signalement créé. Utiliser `/reports`. |
 | GET | `/feedbacks/mine` | Ses propres signalements + les réponses reçues |
 | GET | `/feedbacks/mine/:id` | Détail d'un de ses signalements (404 si ce n'est pas le sien) |
 | GET | `/feedbacks?status=&type=&q=` | Signalements de l'org, filtrables (**admin**) → `{ data, meta, counts }` |
