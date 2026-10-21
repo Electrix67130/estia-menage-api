@@ -20,7 +20,10 @@ import bcrypt from 'bcrypt';
 import knex from 'knex';
 import knexConfig from '@/config/knexfile';
 
-const NOM_ORG = 'Estia Démo (Apple Review)';
+// Vue par les relecteurs Apple ET Google : nom neutre. L'ancien nom reste
+// reconnu pour retrouver (et remplacer) l'organisation déjà en base.
+const NOM_ORG = 'Estia Démo';
+const ANCIENS_NOMS = ['Estia Démo (Apple Review)'];
 const EMAIL_ADMIN = 'demo.admin@estia-clean-connect.fr';
 const EMAIL_PRESTA = 'demo.presta@estia-clean-connect.fr';
 const MOT_DE_PASSE = 'DemoEstia2026!';
@@ -40,7 +43,7 @@ async function main(): Promise<void> {
   const db = knex(knexConfig);
   try {
     // --- Repartir d'une ardoise propre -------------------------------------
-    const existante = await db('organization').where({ name: NOM_ORG }).first();
+    const existante = await db('organization').whereIn('name', [NOM_ORG, ...ANCIENS_NOMS]).first();
     const anciens = (await db('user')
       .whereIn('email', [EMAIL_ADMIN, EMAIL_PRESTA])
       .select('id')) as { id: string }[];

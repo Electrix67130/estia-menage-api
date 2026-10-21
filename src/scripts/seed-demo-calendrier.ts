@@ -22,7 +22,10 @@ import knexConfig from '@/config/knexfile';
 import { generateChecklistForMenage } from '@/modules/menage-check/menage-check.service';
 import type { LogementRow } from '@/modules/logement/logement.schema';
 
-const NOM_ORG = 'Estia Démo (Apple Review)';
+// Vue par les relecteurs Apple ET Google : nom neutre. L'ancien nom reste
+// reconnu, et l'organisation est renommée au passage.
+const NOM_ORG = 'Estia Démo';
+const ANCIENS_NOMS = ['Estia Démo (Apple Review)'];
 const SOURCE = 'demo_calendrier';
 
 /** Date décalée de `jours`, au format YYYY-MM-DD, en heure locale. */
@@ -55,8 +58,12 @@ const SEJOURS = [
 async function main(): Promise<void> {
   const db = knex(knexConfig);
   try {
-    const org = await db('organization').where({ name: NOM_ORG }).first();
+    const org = await db('organization').whereIn('name', [NOM_ORG, ...ANCIENS_NOMS]).first();
     if (!org) throw new Error(`Organisation « ${NOM_ORG} » introuvable : lancez d'abord npm run seed:demo`);
+    if (org.name !== NOM_ORG) {
+      await db('organization').where({ id: org.id }).update({ name: NOM_ORG, updated_at: db.fn.now() });
+      console.log(`Organisation renommée : « ${org.name} » → « ${NOM_ORG} »`);
+    }
 
     const admin = await db('user').where({ email: 'demo.admin@estia-clean-connect.fr' }).first();
     const presta = await db('user').where({ email: 'demo.presta@estia-clean-connect.fr' }).first();
