@@ -284,11 +284,13 @@ export type MenageRow = {
   /** Nombre de membres `prestataire` du logement (= qui peuvent répondre). */
   member_prestataire_count?: number;
   /**
-   * Calculé (cf. `computeNeedsAttention`) : le jour prévu est passé, personne
-   * n'a pointé (`arrived_at` vide) et le ménage est toujours `a_venir`.
-   * Sert à mettre le ménage en évidence côté dashboard/mobile.
+   * Calculé (cf. `computeAttentionReason`) : le jour prévu est passé et la
+   * prestation n'est pas terminée. Sert à la mettre en évidence côté
+   * dashboard/mobile (section « en retard » d'À traiter).
    */
   needs_attention?: boolean;
+  /** Ce qui manque quand `needs_attention` : l'arrivée ou le départ. */
+  attention_reason?: AttentionReason | null;
 };
 
 /**
@@ -301,35 +303,45 @@ export const ADMIN_ONLY_FINANCIAL_FIELDS = [
   'laundry_client_price_ht',
 ] as const;
 
+export type AttentionReason = 'arrival' | 'departure';
+
 /**
- * Un ménage « demande attention » quand son jour prévu est passé, qu'aucun
- * pointage d'arrivée n'a été enregistré, et qu'il est toujours `a_venir`
- * (ni en cours, ni terminé, ni annulé). On compare en date locale serveur
+ * Une prestation (tout type) « demande attention » quand son jour prévu est
+ * passé et qu'elle n'est pas terminée : encore `a_venir` sans arrivée pointée
+ * (→ `arrival`), ou `en_cours` — arrivée pointée, départ oublié (→ `departure`).
+ * Sans ce second cas, une prestation commencée puis jamais clôturée sortait
+ * de toutes les listes de l'admin. On compare en date locale serveur
  * (date_prevue est une DATE sans heure).
  */
-export function computeNeedsAttention(
-  menage: Pick<MenageRow, 'status' | 'date_prevue' | 'arrived_at'> &
-    Partial<Pick<MenageRow, 'prestation_type'>>,
-): boolean {
-  // Le pointage est optionnel pour les check-in/check-out → jamais « non pointé ».
-  if (menage.prestation_type && menage.prestation_type !== 'menage') return false;
-  if (menage.status !== 'a_venir') return false;
-  if (menage.arrived_at) return false;
-  if (!menage.date_prevue) return false;
+export function computeAttentionReason(
+  menage: Pick<MenageRow, 'status' | 'date_prevue' | 'arrived_at'>,
+): AttentionReason | null {
+  let reason: AttentionReason;
+  if (menage.status === 'en_cours') reason = 'departure';
+  else if (menage.status === 'a_venir' && !menage.arrived_at) reason = 'arrival';
+  else return null;
+  if (!menage.date_prevue) return null;
   // `date_prevue` (colonne DATE) peut arriver comme objet Date (node-pg) ou
   // comme chaîne. `toYmd` la lit en heure LOCALE : la lire en UTC reculait d'un
   // jour depuis Paris, et signalait « non pointé » dès le matin même.
   const datePart = toYmd(menage.date_prevue);
-  return datePart !== null && datePart < todayYmd();
+  return datePart !== null && datePart < todayYmd() ? reason : null;
+}
+
+export function computeNeedsAttention(
+  menage: Pick<MenageRow, 'status' | 'date_prevue' | 'arrived_at'>,
+): boolean {
+  return computeAttentionReason(menage) !== null;
 }
 
 export function serializeMenageForRole(
   menage: MenageRow,
   opts: { isAdmin: boolean; isPrestataire: boolean },
 ): Partial<MenageRow> {
-  const needs_attention = computeNeedsAttention(menage);
-  if (opts.isAdmin) return { ...menage, needs_attention };
-  const out: Partial<MenageRow> = { ...menage, needs_attention };
+  const attention_reason = computeAttentionReason(menage);
+  const needs_attention = attention_reason !== null;
+  if (opts.isAdmin) return { ...menage, needs_attention, attention_reason };
+  const out: Partial<MenageRow> = { ...menage, needs_attention, attention_reason };
   for (const field of ADMIN_ONLY_FINANCIAL_FIELDS) {
     delete (out as Record<string, unknown>)[field];
   }

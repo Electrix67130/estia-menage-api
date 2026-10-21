@@ -278,6 +278,23 @@ describe('mes prochaines prestations (vue prestataire)', () => {
     expect(parId.get(remplacement)).toMatchObject({ is_assigned: true, done_by_me: true, assigned_to_someone: true });
   });
 
+  it('remonte aussi ses prestations passées pas terminées, avec ce qui manque', async () => {
+    const { organizationId, admin, marie, logementId } = await contexte();
+    const hier = new Date(Date.now() - 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const base = { logementId, organizationId, createdBy: admin.id, prestataireUserId: marie.id, datePrevue: hier };
+    const departOublie = await createMenage(app, { ...base, status: 'en_cours' });
+    await app.db('menage').where({ id: departOublie }).update({ arrived_at: new Date(Date.now() - 20 * 3600 * 1000) });
+    const jamaisPointee = await createMenage(app, base);
+    await app.db('menage').where({ id: jamaisPointee }).update({ prestation_type: 'check_in' });
+    const terminee = await createMenage(app, { ...base, status: 'termine' });
+
+    const res = await app.inject({ method: 'GET', url: '/prestataires/me/menages', headers: auth(marie.token) });
+    const parId = new Map((res.json().data as Array<Record<string, unknown>>).map((m) => [m.id, m]));
+    expect(parId.get(departOublie)).toMatchObject({ needs_attention: true, attention_reason: 'departure' });
+    expect(parId.get(jamaisPointee)).toMatchObject({ needs_attention: true, attention_reason: 'arrival' });
+    expect(parId.has(terminee)).toBe(false);
+  });
+
   it('en mode historique, ne liste que ce qui a été fait', async () => {
     const { organizationId, admin, marie, logementId, menageId: aVenir } = await contexte();
     const hier = new Date(Date.now() - 24 * 3600 * 1000).toISOString().slice(0, 10);

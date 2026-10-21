@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  computeAttentionReason,
   computeNeedsAttention,
   serializeMenageForRole,
   type MenageRow,
@@ -35,10 +36,28 @@ describe('computeNeedsAttention', () => {
     expect(computeNeedsAttention({ status: 'annule', date_prevue: hier(), arrived_at: null })).toBe(false);
   });
 
-  it('ne signale jamais un check-in ou un check-out, où le pointage est optionnel', () => {
+  it('signale aussi un check-in ou un check-out passé jamais confirmé', () => {
+    const checkIn = { status: 'a_venir', date_prevue: hier(), arrived_at: null, prestation_type: 'check_in' } as const;
+    expect(computeNeedsAttention(checkIn)).toBe(true);
+    expect(computeAttentionReason(checkIn)).toBe('arrival');
+  });
+
+  it('signale une prestation passée restée en cours : départ non pointé', () => {
+    const enCours = { status: 'en_cours', date_prevue: hier(), arrived_at: '2026-07-01T08:00:00.000Z' } as const;
+    expect(computeNeedsAttention(enCours)).toBe(true);
+    expect(computeAttentionReason(enCours)).toBe('departure');
+  });
+
+  it('ne signale pas une prestation en cours le jour même', () => {
+    const today = new Date().toISOString().slice(0, 10);
     expect(
-      computeNeedsAttention({ status: 'a_venir', date_prevue: hier(), arrived_at: null, prestation_type: 'check_in' }),
-    ).toBe(false);
+      computeAttentionReason({ status: 'en_cours', date_prevue: today, arrived_at: '2026-07-01T08:00:00.000Z' }),
+    ).toBeNull();
+  });
+
+  it('ne signale pas une prestation passée terminée ou validée', () => {
+    expect(computeAttentionReason({ status: 'termine', date_prevue: hier(), arrived_at: null })).toBeNull();
+    expect(computeAttentionReason({ status: 'valide', date_prevue: hier(), arrived_at: null })).toBeNull();
   });
 
   it('accepte une date renvoyée en objet Date par node-pg', () => {

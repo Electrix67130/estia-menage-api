@@ -5,7 +5,7 @@ import {
   MenageResponseStatus,
   MyUpcomingMenage,
 } from './menage-response.schema';
-import { computeNeedsAttention, MenageStatus } from '@/modules/menage/menage.schema';
+import { computeAttentionReason, MenageStatus } from '@/modules/menage/menage.schema';
 import { signUrlsInList } from '@/lib/sign-url';
 
 class MenageResponseService {
@@ -109,14 +109,17 @@ class MenageResponseService {
         .whereIn('menage.status', ['termine', 'valide']);
     } else {
       // Upcoming : ménages dans la fenêtre [from, to] À VENIR, PLUS les
-      // ménages « en retard non pointés » (jour passé, toujours a_venir, aucun
-      // pointage) — sinon le presta ne verrait jamais un ménage qu'il a oublié
-      // de faire (et qu'on veut justement mettre en évidence).
+      // prestations « en retard » (jour passé, pas terminées : jamais pointées,
+      // ou en cours avec le départ oublié) — sinon le presta ne verrait jamais
+      // ce qu'il a oublié (et qu'on veut justement mettre en évidence).
+      // Même règle que `computeAttentionReason`.
       baseQuery.whereNotIn('menage.status', ['annule', 'valide']).where(function () {
         this.whereBetween('menage.date_prevue', [from, to]).orWhere(function () {
-          this.where('menage.status', 'a_venir')
-            .whereNull('menage.arrived_at')
-            .where('menage.date_prevue', '<', today);
+          this.where('menage.date_prevue', '<', today).where(function () {
+            this.where('menage.status', 'en_cours').orWhere(function () {
+              this.where('menage.status', 'a_venir').whereNull('menage.arrived_at');
+            });
+          });
         });
       });
     }
@@ -168,19 +171,18 @@ class MenageResponseService {
         ),
         this.db.raw('(menage.prestataire_user_id = ?) as done_by_me', [userId]),
       )
-      .orderBy('menage.date_prevue', 'asc')) as (Omit<MyUpcomingMenage, 'needs_attention'> & {
+      .orderBy('menage.date_prevue', 'asc')) as (Omit<MyUpcomingMenage, 'needs_attention' | 'attention_reason'> & {
       arrived_at: string | null;
     })[];
 
-    return rows.map(({ arrived_at, ...rest }) => ({
-      ...rest,
-      needs_attention: computeNeedsAttention({
+    return rows.map(({ arrived_at, ...rest }) => {
+      const attention_reason = computeAttentionReason({
         status: rest.status as MenageStatus,
         date_prevue: rest.date_prevue,
         arrived_at,
-        prestation_type: rest.prestation_type,
-      }),
-    }));
+      });
+      return { ...rest, needs_attention: attention_reason !== null, attention_reason };
+    });
   }
 
   /**

@@ -397,7 +397,7 @@ Calendriers iCal externes rattachés à un logement. **Admin only** (même org q
 
 Prestation de ménage datée, FK logement + prestataire.
 
-Chaque ménage sérialisé (liste **et** détail) inclut un booléen calculé **`needs_attention`** : `true` quand le jour prévu est passé, qu'aucun pointage d'arrivée n'a été enregistré (`arrived_at` vide) et que le statut est encore `a_venir`. Sert à mettre le ménage en évidence (badge « Non pointé » + carte surlignée) côté dashboard et mobile.
+Chaque prestation sérialisée (liste **et** détail, et `GET /prestataires/me/menages`) inclut un booléen calculé **`needs_attention`** : `true` quand le jour prévu est passé et que la prestation **n'est pas terminée**, quel que soit son type (ménage, check-in, check-out). Le champ **`attention_reason`** dit ce qui manque : `arrival` (encore `a_venir`, arrivée jamais pointée → « Non pointé ») ou `departure` (`en_cours`, départ oublié → « Départ non pointé ») ; `null` sinon. Sert à mettre la prestation en évidence (badge + carte surlignée, section « en retard » d'À traiter) côté dashboard et mobile.
 
 | Méthode | Endpoint | Description |
 |---|---|---|

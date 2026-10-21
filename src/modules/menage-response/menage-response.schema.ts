@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { AttentionReason } from '@/modules/menage/menage.schema';
 
 export const menageResponseStatusEnum = z.enum(['present', 'absent']);
 export type MenageResponseStatus = z.infer<typeof menageResponseStatusEnum>;
@@ -42,8 +43,10 @@ export type MyUpcomingMenage = {
   horaire_prevu: string | null;
   duree_estimee_min: number | null;
   status: string;
-  /** Calculé : jour passé + aucun pointage + statut a_venir. */
+  /** Calculé : jour passé et prestation pas terminée (cf. `computeAttentionReason`). */
   needs_attention: boolean;
+  /** Ce qui manque : l'arrivée (`arrival`) ou le départ (`departure`). */
+  attention_reason: AttentionReason | null;
   /** Réponse personnelle du user appelant, null s'il n'a pas encore répondu. */
   my_response: MenageResponseStatus | null;
   /** true si le user est affecté à ce ménage (table menage_prestataire). */
