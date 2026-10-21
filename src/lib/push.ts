@@ -89,6 +89,8 @@ export async function sendPushToUsers(
       data: message.data ?? {},
       sound: 'default',
       channelId: 'default',
+      // Sans 'high', FCM peut différer la livraison quand le téléphone Android est en veille.
+      priority: 'high',
     }));
 
     try {
